@@ -98,7 +98,7 @@
                 </div>
 
                 <!-- SEÇÃO 2: AÇÕES DO SISTEMA & ENERGIA (Protegida) -->
-                <div class="section-label" style="margin-top: 14px;">Sistema & Energia</div>
+                <div class="section-label">Sistema & Energia</div>
                 <div class="system-actions-grid">
                     {% for b_id in ['apagar-tela', 'poweroff'] %}
                     {% for botao in config.botoes %}
@@ -131,7 +131,7 @@
                     {% endif %}
                 {% endfor %}
                 {% if extra_buttons %}
-                <div class="section-label" style="margin-top: 14px;">Outros Atalhos</div>
+                <div class="section-label">Outros Atalhos</div>
                 <div class="grid-controls">
                     {% for botao in extra_buttons %}
                     <button class="ctrl-btn cor-{{ botao.get('cor', 'blue') }} largura-{{ botao.get('largura', 'metade') }}"
@@ -276,7 +276,7 @@
                     </div>
 
                     <!-- Linha 3: Atalhos Rápidos de Apps da TV (YouTube / Netflix) -->
-                    <div class="tv-actions-row" style="margin-top: 2px;">
+                    <div class="tv-actions-row">
                         <button type="button" class="tv-nav-btn tv-app-btn app-youtube" onclick="executar('tv-youtube', 'YouTube TV')">
                             <span>▶</span> <span>YouTube</span>
                         </button>
