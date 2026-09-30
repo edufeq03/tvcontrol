@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="{{ config.titulo }}">
+    <title>{{ config.titulo }}</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <div class="brand">
+                <span>📺</span> {{ config.titulo }}
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="qr-btn" onclick="abrirModalQR()" title="Exibir QR Code para conectar celular">
+                    <span>📱</span>
+                    <span>Conectar</span>
+                </button>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span>Online</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="tab-views-container">
+            <!-- ABA 1: CONTROLES DE STREAMING / NETFLIX -->
+            <section id="view-controls" class="tab-view active">
+                <!-- Widget de Volume em Tempo Real -->
+                <div class="volume-widget">
+                    <button type="button" class="vol-mute-btn" id="volMuteBtn" onclick="alternarMudo()" title="Mudo">
+                        <span id="volIcon">🔊</span>
+                    </button>
+                    <div class="vol-slider-wrap">
+                        <input type="range" min="0" max="100" value="50" class="vol-slider" id="volSlider" oninput="onVolumeSliderChange(this.value)">
+                    </div>
+                    <span class="vol-percent" id="volPercent">--%</span>
+                </div>
+
+                <div class="grid-controls">
+                    {% for botao in config.botoes %}
+                    {% if botao.get('ativo', True) and botao.get('tag') != 'TV' %}
+                    
+                    <button class="ctrl-btn cor-{{ botao.get('cor', 'blue') }} largura-{{ botao.get('largura', 'metade') }}"
+                            id="btn-{{ botao.id }}"
+                            data-btn-id="{{ botao.id }}"
+                            data-label="{{ botao.label }}"
+                            data-confirm="{{ 'true' if botao.get('confirmar') else 'false' }}"
+                            data-sub="{{ botao.get('sub', '') }}">
+                        
+                        {% if botao.get('largura') == 'cheia' %}
+                        <div class="main-content">
+                            <div class="ctrl-icon">
+                                {{ icones.get(botao.get('icone'), icones['default']) | safe }}
+                            </div>
+                            <div class="ctrl-text">
+                                <span class="ctrl-title">{{ botao.label }}</span>
+                                {% if botao.get('sub') %}
+                                <span class="ctrl-sub">{{ botao.sub }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if botao.get('tag') %}
+                        <span class="pill-tag">{{ botao.tag }}</span>
+                        {% endif %}
+
+                        {% else %}
+                        <div class="ctrl-icon">
+                            {{ icones.get(botao.get('icone'), icones['default']) | safe }}
+                        </div>
+                        <div class="ctrl-text">
+                            <span class="ctrl-title">{{ botao.label }}</span>
+                            {% if botao.get('sub') %}
+                            <span class="ctrl-sub">{{ botao.sub }}</span>
+                            {% endif %}
+                        </div>
+                        {% if botao.get('tag') %}
+                        <span class="card-tag-badge">{{ botao.tag }}</span>
+                        {% endif %}
+                        {% endif %}
+                    </button>
+
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- ABA 2: TOUCHPAD / MOUSE VIRTUAL -->
+            <section id="view-touchpad" class="tab-view">
+                <div class="touchpad-wrapper">
+                    <div id="touchpad-surface" class="touchpad-surface">
+                        <div class="touchpad-hint">
+                            <div class="touchpad-icon">🖱️</div>
+                            <span>Touchpad Virtual</span>
+                            <span class="touchpad-subhint">1 toque: Clique • 2 toques: Botão direito<br>Arraste na barra lateral para Rolar</span>
+                        </div>
+                        <div class="scroll-strip">
+                            <span>▲</span>
+                            <span>ROLAR</span>
+                            <span>▼</span>
+                        </div>
+                    </div>
+                    <div class="mouse-buttons-row">
+                        <button class="mouse-btn mouse-btn-left" onclick="sendMouseClick(1)">Clique Esquerdo</button>
+                        <button class="mouse-btn mouse-btn-right" onclick="sendMouseClick(3)">Clique Direito</button>
+                    </div>
+                    <!-- Digitação Rápida / Teclado no PC (Painel Recolhível) -->
+                    <div class="keyboard-collapsible">
+                        <button type="button" class="keyboard-toggle-btn" id="btnToggleKeyboard" onclick="toggleKeyboardPanel()">
+                            <span>⌨️ Digitar no PC</span>
+                            <span id="keyboardToggleIcon">▼</span>
+                        </button>
+                        <div class="keyboard-box" id="keyboardBox" style="display: none;">
+                            <form onsubmit="enviarTextoDigitado(event)" class="keyboard-input-row">
+                                <input type="text" id="keyboardInput" placeholder="Digitar no PC (ex: busca YouTube)..." autocomplete="off">
+                                <button type="submit" class="keyboard-send-btn">Enviar</button>
+                            </form>
+                            <div class="keyboard-quick-keys">
+                                <button type="button" class="quick-key" onclick="enviarTecla('Return')">↵ Enter</button>
+                                <button type="button" class="quick-key" onclick="enviarTecla('BackSpace')">⌫ Apagar</button>
+                                <button type="button" class="quick-key" onclick="enviarTecla('space')">␣ Espaço</button>
+                                <button type="button" class="quick-key" onclick="enviarTecla('Escape')">Esc</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 3: MODO SLEEP / TEMPORIZADOR -->
+            <section id="view-timer" class="tab-view">
+                <div class="timer-wrapper">
+                    <div class="timer-status-card">
+                        <div class="timer-badge">
+                            <span>😴</span> <span id="timerStatusText">Nenhum temporizador ativo</span>
+                        </div>
+                        <div class="timer-countdown" id="timerCountdown">--:--</div>
+                        <button class="btn-cancel-timer" id="btnCancelTimer" style="display: none;" onclick="cancelTimer()">
+                            ✕ Cancelar Temporizador
+                        </button>
+                    </div>
+
+                    <div class="timer-section-label">Definir Desligamento Automático:</div>
+                    <div class="timer-grid">
+                        <button class="timer-preset-btn" onclick="setTimer(15)">15 min</button>
+                        <button class="timer-preset-btn" onclick="setTimer(30)">30 min</button>
+                        <button class="timer-preset-btn" onclick="setTimer(45)">45 min</button>
+                        <button class="timer-preset-btn" onclick="setTimer(60)">1 hora</button>
+                        <button class="timer-preset-btn" onclick="setTimer(90)">1h 30m</button>
+                        <button class="timer-preset-btn" onclick="setTimer(120)">2 horas</button>
+                    </div>
+
+                    <div class="timer-actions-row">
+                        <button class="timer-action-btn btn-screen-action" onclick="executar('apagar-tela', 'Apagar Tela')">
+                            🌙 Apagar Tela
+                        </button>
+                        <button class="timer-action-btn btn-power-action" onclick="abrirConfirmacao('poweroff', 'Desligar PC', 'Encerrar o sistema agora')">
+                            ⏻ Desligar Agora
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 4: CONTROLES DA ANDROID TV -->
+            <section id="view-tv" class="tab-view">
+                <div class="tv-wrapper">
+                    <div class="tv-header-card">
+                        <div class="tv-badge">
+                            <span>📺</span>
+                            <span>Android TV Remote</span>
+                        </div>
+                        <div class="tv-device-info">Dispositivo: {{ config.get('tv_ip', '192.168.1.100') }}</div>
+                    </div>
+
+                    <!-- D-Pad Direcional Real -->
+                    <div class="dpad-container">
+                        <div class="dpad-cross">
+                            <button type="button" class="dpad-btn dpad-up" onclick="executar('tv-up', 'Cima')" aria-label="Cima">▲</button>
+                            <button type="button" class="dpad-btn dpad-left" onclick="executar('tv-left', 'Esquerda')" aria-label="Esquerda">◀</button>
+                            <button type="button" class="dpad-btn dpad-ok" onclick="executar('tv-ok', 'OK')" aria-label="OK">OK</button>
+                            <button type="button" class="dpad-btn dpad-right" onclick="executar('tv-right', 'Direita')" aria-label="Direita">▶</button>
+                            <button type="button" class="dpad-btn dpad-down" onclick="executar('tv-down', 'Baixo')" aria-label="Baixo">▼</button>
+                        </div>
+                    </div>
+
+                    <!-- Teclas de Navegação da TV -->
+                    <div class="tv-actions-row">
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-back', 'Voltar')">↩ Voltar</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-home', 'Início')">🏠 Início</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-play', 'Play/Pause')">⏯️ Play</button>
+                    </div>
+
+                    <!-- Controle de Volume e Energia da TV -->
+                    <div class="tv-actions-row">
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-vol-down', 'TV Vol -')">🔉 Vol -</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-vol-up', 'TV Vol +')">🔊 Vol +</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-power', 'TV Power')">⏻ Power</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Barra de Abas Inferior Fixa (Polegar Mobile) -->
+        <nav class="bottom-tab-bar" aria-label="Navegação Principal">
+            <button class="bottom-tab-btn active" id="tab-controls" onclick="switchTab('controls')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="2" y="2" width="20" height="20" rx="4"></rect>
+                    <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+                </svg>
+                <span class="tab-label">Controles</span>
+            </button>
+            <button class="bottom-tab-btn" id="tab-touchpad" onclick="switchTab('touchpad')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="5" y="2" width="14" height="20" rx="7"></rect>
+                    <line x1="12" y1="6" x2="12" y2="10"></line>
+                </svg>
+                <span class="tab-label">Touchpad</span>
+            </button>
+            <button class="bottom-tab-btn" id="tab-timer" onclick="switchTab('timer')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span class="tab-label">Sleep</span>
+            </button>
+            <button class="bottom-tab-btn" id="tab-tv" onclick="switchTab('tv')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="2" y="7" width="20" height="15" rx="2"></rect>
+                    <polyline points="17 2 12 7 7 2"></polyline>
+                </svg>
+                <span class="tab-label">TV</span>
+            </button>
+        </nav>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <div id="confirmModal" class="modal-backdrop">
+        <div class="modal-box">
+            <div class="modal-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+            </div>
+            <h3 class="modal-title" id="modalTitle">Confirmar Ação</h3>
+            <p class="modal-desc" id="modalDesc">Deseja realmente executar este comando?</p>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" onclick="fecharConfirmacao()">Cancelar</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmarExecucao()">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal QR Code / Conectar Celular -->
+    <div id="qrModal" class="modal-backdrop" onclick="if(event.target===this) fecharModalQR()">
+        <div class="modal-box qr-modal-box">
+            <div class="modal-close-btn" onclick="fecharModalQR()">✕</div>
+            <div class="qr-code-wrapper">
+                <img src="/qrcode" alt="QR Code" id="qrImage">
+            </div>
+            <h3 class="modal-title" style="margin-top: 14px;">Conectar Celular</h3>
+            <p class="modal-desc" style="margin-bottom: 10px;">Aponte a câmera do seu celular para o QR Code (no mesmo Wi-Fi) ou use o link abaixo:</p>
+            
+            <div class="qr-url-box">
+                <input type="text" id="qrUrlInput" value="{{ local_url }}" readonly>
+                <button class="copy-btn" id="btnCopiarLink" onclick="copiarLinkConexao()" title="Copiar Link">
+                    <span id="copyIcon">📋</span>
+                </button>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 14px;">
+                <button class="modal-btn modal-btn-cancel" style="width: 100%;" onclick="fecharModalQR()">Fechar</button>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

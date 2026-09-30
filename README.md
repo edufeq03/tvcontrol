@@ -156,7 +156,7 @@ If your Android TV has ADB debugging enabled over Wi-Fi:
   "id": "tv-vol-up",
   "label": "TV Vol +",
   "sub": "Android TV",
-  "comando": "adb -s 192.168.15.5 shell input keyevent 24",
+  "comando": "adb -s 192.168.1.100 shell input keyevent 24",
   "icone": "vol-up",
   "cor": "cyan",
   "largura": "metade",
