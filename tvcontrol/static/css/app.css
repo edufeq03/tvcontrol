@@ -27,6 +27,7 @@
         html {
             height: 100%;
             background: #080d1a;
+            font-size: 16px;
             -webkit-text-size-adjust: 100%;
         }
 
@@ -43,7 +44,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 8px 10px max(16px, env(safe-area-inset-bottom));
+            padding: 10px 12px max(20px, env(safe-area-inset-bottom));
             overflow-x: hidden;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
@@ -61,7 +62,7 @@
         body.touchpad-active .wrapper {
             height: 100%;
             flex: 1;
-            padding-bottom: calc(65px + env(safe-area-inset-bottom));
+            padding-bottom: calc(75px + env(safe-area-inset-bottom));
         }
 
         body.touchpad-active #view-touchpad {
@@ -76,10 +77,10 @@
             max-width: 480px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
             margin: 0 auto;
             box-sizing: border-box;
-            padding-bottom: calc(75px + env(safe-area-inset-bottom));
+            padding-bottom: calc(88px + env(safe-area-inset-bottom));
             transition: max-width 0.25s ease;
         }
 
@@ -106,7 +107,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 2px 2px 4px;
+            padding: 4px 2px 6px;
             flex-shrink: 0;
             box-sizing: border-box;
         }
@@ -114,8 +115,8 @@
         .brand {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 1.15rem;
+            gap: 8px;
+            font-size: 1.25rem;
             font-weight: 800;
             letter-spacing: -0.5px;
             background: linear-gradient(135deg, #ffffff 40%, #94a3b8);
@@ -127,23 +128,23 @@
         .status-badge {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 2px 8px;
+            gap: 6px;
+            padding: 4px 10px;
             background: rgba(34, 197, 94, 0.1);
             border: 1px solid rgba(34, 197, 94, 0.25);
             border-radius: 9999px;
-            font-size: 0.7rem;
+            font-size: 0.78rem;
             font-weight: 600;
             color: #4ade80;
             flex-shrink: 0;
         }
 
         .status-dot {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background-color: #22c55e;
-            box-shadow: 0 0 6px #22c55e;
+            box-shadow: 0 0 8px #22c55e;
             animation: pulse 2s infinite;
         }
 
@@ -156,12 +157,12 @@
         .qr-btn {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 4px 10px;
+            gap: 6px;
+            padding: 6px 12px;
             background: rgba(59, 130, 246, 0.15);
             border: 1px solid rgba(59, 130, 246, 0.35);
             border-radius: 9999px;
-            font-size: 0.72rem;
+            font-size: 0.8rem;
             font-weight: 700;
             color: #60a5fa;
             cursor: pointer;
@@ -177,14 +178,11 @@
         }
 
         @media (max-width: 480px) {
-            .qr-btn span:last-child {
-                display: none;
-            }
             .qr-btn {
-                padding: 4px 8px;
+                padding: 5px 10px;
             }
             .brand {
-                font-size: 1.05rem;
+                font-size: 1.15rem;
             }
         }
 
@@ -194,16 +192,16 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: rgba(10, 15, 28, 0.94);
+            background: rgba(10, 15, 28, 0.96);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            padding: 6px 12px max(8px, env(safe-area-inset-bottom));
-            gap: 4px;
+            padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+            gap: 6px;
             z-index: 100;
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.5);
             max-width: 520px;
             margin: 0 auto;
             border-radius: 20px 20px 0 0;
@@ -215,7 +213,7 @@
                 bottom: 12px;
                 border-radius: 24px;
                 border: 1px solid rgba(255, 255, 255, 0.12);
-                padding: 6px 12px;
+                padding: 8px 14px;
             }
         }
 
@@ -224,12 +222,12 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 3px;
-            padding: 6px 2px;
-            min-height: 48px;
+            gap: 4px;
+            padding: 8px 4px;
+            min-height: 54px;
             background: transparent;
             border: none;
-            border-radius: 12px;
+            border-radius: 14px;
             color: #64748b;
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -238,14 +236,14 @@
         }
 
         .bottom-tab-btn svg {
-            width: 22px;
-            height: 22px;
+            width: 25px;
+            height: 25px;
             stroke-width: 2.2;
             transition: transform 0.2s, stroke 0.2s;
         }
 
         .bottom-tab-btn .tab-label {
-            font-size: 0.72rem;
+            font-size: 0.78rem;
             font-weight: 700;
             letter-spacing: 0.2px;
             white-space: nowrap;
@@ -257,7 +255,7 @@
 
         .bottom-tab-btn.active {
             color: #60a5fa;
-            background: rgba(59, 130, 246, 0.12);
+            background: rgba(59, 130, 246, 0.14);
         }
 
         .bottom-tab-btn.active svg {
@@ -293,7 +291,7 @@
         .grid-controls {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            gap: 12px;
             width: 100%;
             box-sizing: border-box;
             padding-bottom: 24px;
@@ -301,33 +299,33 @@
 
         @media (min-width: 600px) {
             .grid-controls {
-                gap: 12px;
+                gap: 14px;
             }
         }
 
         @media (min-width: 768px) {
             .grid-controls {
                 grid-template-columns: repeat(3, 1fr);
-                gap: 14px;
+                gap: 16px;
             }
         }
 
         @media (min-width: 1024px) {
             .grid-controls {
                 grid-template-columns: repeat(4, 1fr);
-                gap: 14px;
+                gap: 16px;
             }
         }
 
         .ctrl-btn {
             position: relative;
-            border-radius: 18px;
+            border-radius: 20px;
             border: 1px solid rgba(255, 255, 255, 0.09);
-            background: rgba(19, 26, 42, 0.76);
+            background: rgba(19, 26, 42, 0.78);
             backdrop-filter: blur(16px);
             cursor: pointer;
             transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
             overflow: hidden;
             outline: none;
             -webkit-tap-highlight-color: transparent;
@@ -349,24 +347,24 @@
         /* Botão de Largura Cheia */
         .ctrl-btn.largura-cheia {
             grid-column: 1 / -1;
-            min-height: 72px;
+            min-height: 84px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 12px 18px;
+            padding: 14px 18px;
         }
 
         .ctrl-btn.largura-cheia .main-content {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
             min-width: 0;
         }
 
         .ctrl-btn.largura-cheia .ctrl-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -377,12 +375,12 @@
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            gap: 2px;
+            gap: 3px;
             min-width: 0;
         }
 
         .ctrl-btn.largura-cheia .ctrl-title {
-            font-size: 1.05rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: -0.2px;
@@ -392,7 +390,7 @@
         }
 
         .ctrl-btn.largura-cheia .ctrl-sub {
-            font-size: 0.78rem;
+            font-size: 0.85rem;
             font-weight: 500;
             color: #94a3b8;
             white-space: nowrap;
@@ -401,11 +399,11 @@
         }
 
         .ctrl-btn.largura-cheia .pill-tag {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            padding: 4px 10px;
+            padding: 5px 12px;
             border-radius: 9999px;
             flex-shrink: 0;
         }
@@ -413,19 +411,19 @@
         /* Botão Padrão de Grade (Metade) */
         .ctrl-btn.largura-metade {
             grid-column: span 1;
-            min-height: 104px;
+            min-height: 118px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            padding: 14px 10px;
+            gap: 10px;
+            padding: 16px 12px;
         }
 
         .ctrl-btn.largura-metade .ctrl-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -437,13 +435,13 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
+            gap: 3px;
             text-align: center;
             min-width: 0;
         }
 
         .ctrl-btn.largura-metade .ctrl-title {
-            font-size: 0.95rem;
+            font-size: 1.05rem;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: -0.2px;
@@ -456,7 +454,7 @@
         }
 
         .ctrl-btn.largura-metade .ctrl-sub {
-            font-size: 0.74rem;
+            font-size: 0.82rem;
             font-weight: 500;
             color: #94a3b8;
             line-height: 1.2;
@@ -470,13 +468,13 @@
         /* Tag badge elegante para cards menores */
         .ctrl-btn .card-tag-badge {
             position: absolute;
-            top: 6px;
-            right: 7px;
-            font-size: 0.62rem;
+            top: 7px;
+            right: 8px;
+            font-size: 0.68rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            padding: 2px 7px;
+            padding: 3px 8px;
             border-radius: 9999px;
             background: rgba(255, 255, 255, 0.08);
             color: #94a3b8;
@@ -485,8 +483,8 @@
         }
 
         .ctrl-icon svg {
-            width: 25px;
-            height: 25px;
+            width: 28px;
+            height: 28px;
             stroke-width: 2.2;
             color: #ffffff;
         }
@@ -532,10 +530,10 @@
 
         .touchpad-surface {
             flex: 1;
-            min-height: 220px;
-            background: rgba(19, 26, 42, 0.72);
+            min-height: 250px;
+            background: rgba(19, 26, 42, 0.75);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
+            border-radius: 18px;
             position: relative;
             touch-action: none;
             display: flex;
@@ -554,16 +552,16 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             color: #64748b;
             pointer-events: none;
             text-align: center;
             padding: 16px;
         }
 
-        .touchpad-icon { font-size: 2rem; opacity: 0.7; }
-        .touchpad-hint span { font-size: 0.88rem; font-weight: 600; color: #94a3b8; }
-        .touchpad-subhint { font-size: 0.72rem !important; color: #64748b !important; }
+        .touchpad-icon { font-size: 2.4rem; opacity: 0.75; }
+        .touchpad-hint span { font-size: 0.98rem; font-weight: 600; color: #94a3b8; }
+        .touchpad-subhint { font-size: 0.8rem !important; color: #64748b !important; }
 
         /* Scroll Strip no lado direito */
         .scroll-strip {
@@ -571,16 +569,16 @@
             right: 0;
             top: 0;
             bottom: 0;
-            width: 44px;
+            width: 48px;
             background: rgba(255, 255, 255, 0.03);
             border-left: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 12px 0;
+            padding: 14px 0;
             color: #64748b;
-            font-size: 0.62rem;
+            font-size: 0.68rem;
             font-weight: 700;
             letter-spacing: 1px;
             writing-mode: vertical-rl;
@@ -590,21 +588,21 @@
 
         .mouse-buttons-row {
             display: flex;
-            gap: 8px;
-            height: 52px;
+            gap: 10px;
+            height: 58px;
             flex-shrink: 0;
         }
 
         .mouse-btn {
-            border-radius: 14px;
+            border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(19, 26, 42, 0.85);
+            background: rgba(19, 26, 42, 0.88);
             color: #e2e8f0;
-            font-size: 0.88rem;
+            font-size: 0.98rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.15s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
             outline: none;
         }
 
@@ -630,13 +628,13 @@
         .timer-status-card {
             background: rgba(19, 26, 42, 0.8);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 16px 14px;
+            border-radius: 18px;
+            padding: 18px 16px;
             text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
         }
 
@@ -644,13 +642,13 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.82rem;
+            font-size: 0.88rem;
             font-weight: 600;
             color: #94a3b8;
         }
 
         .timer-countdown {
-            font-size: 2.4rem;
+            font-size: 2.8rem;
             font-weight: 800;
             letter-spacing: -1px;
             color: #ffffff;
@@ -664,12 +662,12 @@
         }
 
         .btn-cancel-timer {
-            padding: 6px 16px;
+            padding: 8px 18px;
             border-radius: 9999px;
             background: rgba(239, 68, 68, 0.2);
             border: 1px solid rgba(239, 68, 68, 0.4);
             color: #f87171;
-            font-size: 0.78rem;
+            font-size: 0.85rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -678,7 +676,7 @@
         .btn-cancel-timer:hover { background: rgba(239, 68, 68, 0.3); }
 
         .timer-section-label {
-            font-size: 0.78rem;
+            font-size: 0.85rem;
             font-weight: 700;
             color: #94a3b8;
             text-transform: uppercase;
@@ -689,7 +687,7 @@
         .timer-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
+            gap: 10px;
             width: 100%;
         }
 
@@ -700,12 +698,12 @@
         }
 
         .timer-preset-btn {
-            height: 58px;
+            height: 64px;
             border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.09);
             background: rgba(19, 26, 42, 0.82);
             color: #ffffff;
-            font-size: 0.98rem;
+            font-size: 1.05rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
@@ -733,9 +731,9 @@
 
         .timer-action-btn {
             flex: 1;
-            height: 54px;
+            height: 56px;
             border-radius: 16px;
-            font-size: 0.92rem;
+            font-size: 0.98rem;
             font-weight: 700;
             display: flex;
             align-items: center;
@@ -1002,29 +1000,29 @@
         .volume-widget {
             display: flex;
             align-items: center;
-            gap: 12px;
-            background: rgba(15, 23, 42, 0.9);
+            gap: 14px;
+            background: rgba(15, 23, 42, 0.92);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 10px 14px;
+            border-radius: 18px;
+            padding: 12px 16px;
             margin-bottom: 12px;
             width: 100%;
             box-sizing: border-box;
             backdrop-filter: blur(16px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
             position: relative;
             z-index: 10;
         }
 
         .vol-mute-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
-            width: 44px;
-            height: 44px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            width: 50px;
+            height: 50px;
             color: #cbd5e1;
             cursor: pointer;
-            font-size: 1.25rem;
+            font-size: 1.4rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1052,34 +1050,34 @@
         .vol-slider {
             -webkit-appearance: none;
             width: 100%;
-            height: 10px;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.14);
+            height: 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.15);
             outline: none;
             transition: background 0.15s;
         }
 
         .vol-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 26px;
-            height: 26px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background: #3b82f6;
             cursor: pointer;
-            box-shadow: 0 0 12px rgba(59, 130, 246, 0.7);
-            border: 2px solid #ffffff;
+            box-shadow: 0 0 14px rgba(59, 130, 246, 0.8);
+            border: 3px solid #ffffff;
             transition: transform 0.1s ease;
         }
 
         .vol-slider::-webkit-slider-thumb:active {
-            transform: scale(1.15);
+            transform: scale(1.18);
         }
 
         .vol-percent {
-            font-size: 0.92rem;
+            font-size: 1.05rem;
             font-weight: 700;
             color: #94a3b8;
-            min-width: 44px;
+            min-width: 48px;
             text-align: right;
             font-variant-numeric: tabular-nums;
         }
@@ -1097,13 +1095,13 @@
             align-items: center;
             justify-content: space-between;
             width: 100%;
-            min-height: 44px;
-            padding: 10px 14px;
+            min-height: 48px;
+            padding: 12px 16px;
             background: rgba(15, 23, 42, 0.85);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
+            border-radius: 14px;
             color: #cbd5e1;
-            font-size: 0.92rem;
+            font-size: 0.98rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -1120,8 +1118,8 @@
             width: 100%;
             background: rgba(15, 23, 42, 0.92);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 14px;
-            padding: 10px;
+            border-radius: 16px;
+            padding: 12px;
             box-sizing: border-box;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
         }
@@ -1136,11 +1134,11 @@
             flex: 1;
             background: rgba(2, 6, 23, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 12px;
-            padding: 12px 14px;
+            border-radius: 14px;
+            padding: 12px 16px;
             color: #ffffff;
             font-size: 16px; /* Essencial para evitar auto-zoom no iOS Safari */
-            min-height: 44px;
+            min-height: 48px;
             outline: none;
             font-family: inherit;
         }
@@ -1154,11 +1152,11 @@
             background: linear-gradient(135deg, #2563eb, #3b82f6);
             border: none;
             color: white;
-            padding: 12px 16px;
-            min-height: 44px;
-            min-width: 60px;
-            border-radius: 12px;
-            font-size: 0.88rem;
+            padding: 12px 18px;
+            min-height: 48px;
+            min-width: 68px;
+            border-radius: 14px;
+            font-size: 0.95rem;
             font-weight: 700;
             cursor: pointer;
             box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
@@ -1175,13 +1173,13 @@
 
         .quick-key {
             flex: 1;
-            min-height: 44px;
+            min-height: 48px;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 10px 4px;
             color: #f1f5f9;
-            font-size: 0.88rem;
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease;
@@ -1203,18 +1201,18 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            margin: 18px 0;
+            margin: 20px 0;
             width: 100%;
         }
 
         .dpad-cross {
             position: relative;
-            width: 220px;
-            height: 220px;
-            background: rgba(15, 23, 42, 0.85);
+            width: 260px;
+            height: 260px;
+            background: rgba(15, 23, 42, 0.88);
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 50%;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 2px 10px rgba(255, 255, 255, 0.05);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), inset 0 2px 10px rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(16px);
         }
 
@@ -1223,7 +1221,7 @@
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: #e2e8f0;
-            font-size: 1.1rem;
+            font-size: 1.35rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
@@ -1241,54 +1239,54 @@
         }
 
         .dpad-up {
-            top: 10px;
+            top: 12px;
             left: 50%;
             transform: translateX(-50%);
-            width: 60px;
-            height: 52px;
-            border-radius: 18px 18px 8px 8px;
+            width: 72px;
+            height: 62px;
+            border-radius: 20px 20px 8px 8px;
         }
 
         .dpad-down {
-            bottom: 10px;
+            bottom: 12px;
             left: 50%;
             transform: translateX(-50%);
-            width: 60px;
-            height: 52px;
-            border-radius: 8px 8px 18px 18px;
+            width: 72px;
+            height: 62px;
+            border-radius: 8px 8px 20px 20px;
         }
 
         .dpad-left {
-            left: 10px;
+            left: 12px;
             top: 50%;
             transform: translateY(-50%);
-            width: 52px;
-            height: 60px;
-            border-radius: 18px 8px 8px 18px;
+            width: 62px;
+            height: 72px;
+            border-radius: 20px 8px 8px 20px;
         }
 
         .dpad-right {
-            right: 10px;
+            right: 12px;
             top: 50%;
             transform: translateY(-50%);
-            width: 52px;
-            height: 60px;
-            border-radius: 8px 18px 18px 8px;
+            width: 62px;
+            height: 72px;
+            border-radius: 8px 20px 20px 8px;
         }
 
         .dpad-ok {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 66px;
-            height: 66px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
             background: linear-gradient(135deg, #0284c7, #2563eb);
             color: #ffffff;
-            font-size: 1rem;
+            font-size: 1.15rem;
             font-weight: 800;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.25);
         }
 
         .dpad-ok:active {
@@ -1300,25 +1298,25 @@
             display: flex;
             gap: 10px;
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .tv-nav-btn {
             flex: 1;
-            min-height: 48px;
+            min-height: 54px;
             background: rgba(15, 23, 42, 0.85);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 14px;
+            border-radius: 16px;
             color: #f1f5f9;
-            font-size: 0.92rem;
+            font-size: 1rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
             transition: all 0.15s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
         }
 
         .tv-nav-btn:active {

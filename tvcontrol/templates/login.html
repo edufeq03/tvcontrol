@@ -98,16 +98,60 @@
             background: rgba(239, 68, 68, 0.15);
             border: 1px solid rgba(239, 68, 68, 0.3);
             color: #fca5a5;
-            padding: 10px 12px;
-            border-radius: 10px;
-            font-size: 0.82rem;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.85rem;
             margin-bottom: 18px;
+            text-align: left;
         }
-        .hint {
+        .token-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .token-toggle-btn {
+            position: absolute;
+            right: 12px;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .help-box {
+            margin-top: 24px;
+            padding: 14px;
+            background: rgba(2, 6, 23, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .help-item {
+            font-size: 0.78rem;
+            color: #94a3b8;
+            line-height: 1.45;
+        }
+        .help-item strong {
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 2px;
+        }
+        .help-item code {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 6px;
+            border-radius: 6px;
+            color: #38bdf8;
             font-size: 0.75rem;
-            color: #64748b;
-            margin-top: 20px;
-            line-height: 1.4;
+            word-break: break-all;
         }
     </style>
 </head>
@@ -124,14 +168,38 @@
         <form action="/login" method="POST">
             <div class="input-group">
                 <label for="token">Token de Acesso</label>
-                <input type="password" id="token" name="token" placeholder="Digite o token..." required autofocus>
+                <div class="token-input-wrapper">
+                    <input type="password" id="token" name="token" placeholder="Cole ou digite o token..." required autofocus>
+                    <button type="button" class="token-toggle-btn" onclick="toggleTokenVisibility()" title="Mostrar/Ocultar token" id="toggleTokenBtn">👁️</button>
+                </div>
             </div>
             <button type="submit" class="btn-submit">Desbloquear</button>
         </form>
 
-        <div class="hint">
-            O token é exibido no terminal ao iniciar o servidor ou pode ser configurado em ~/.config/ignocontrol/config.json.
+        <div class="help-box">
+            <div class="help-item">
+                <strong>📱 Pareamento Rápido via QR Code</strong>
+                <span>No PC (onde o controle já está aberto em <code>http://localhost:7000</code>), clique no botão <strong>📱 Conectar</strong> no topo e aponte a câmera deste celular para entrar sem digitar nada!</span>
+            </div>
+            <div class="help-item">
+                <strong>🔑 Onde encontrar o token:</strong>
+                <span>Salvo no PC no arquivo: <code>~/.config/ignocontrol/config.json</code></span>
+            </div>
         </div>
     </div>
+
+    <script>
+        function toggleTokenVisibility() {
+            const input = document.getElementById('token');
+            const btn = document.getElementById('toggleTokenBtn');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+    </script>
 </body>
 </html>
