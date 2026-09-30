@@ -147,7 +147,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0b0f19">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -166,7 +166,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             margin: 0;
             padding: 0;
             -webkit-tap-highlight-color: transparent;
+        }
+
+        .ctrl-btn, .mouse-btn, .quick-key, .touchpad-surface, .bottom-tab-btn, .dpad-btn, .tv-nav-btn, .timer-preset-btn, .vol-mute-btn {
             user-select: none;
+            -webkit-user-select: none;
         }
 
         html {
@@ -188,7 +192,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 8px 10px max(24px, env(safe-area-inset-bottom));
+            padding: 8px 10px max(16px, env(safe-area-inset-bottom));
             overflow-x: hidden;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
@@ -196,12 +200,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             box-sizing: border-box;
         }
 
-        /* Bloqueia scroll da página quando na aba Touchpad para máxima precisão nos gestos */
+        /* Bloqueia scroll da página quando na aba Touchpad */
         body.touchpad-active {
             overflow: hidden;
             height: 100vh;
             height: 100dvh;
-            padding-bottom: 8px;
+        }
+
+        body.touchpad-active .wrapper {
+            height: 100%;
+            flex: 1;
+            padding-bottom: calc(65px + env(safe-area-inset-bottom));
+        }
+
+        body.touchpad-active #view-touchpad {
+            height: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         .wrapper {
@@ -209,9 +225,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             max-width: 480px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
             margin: 0 auto;
             box-sizing: border-box;
+            padding-bottom: calc(75px + env(safe-area-inset-bottom));
             transition: max-width 0.25s ease;
         }
 
@@ -320,71 +337,85 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
-        /* Tab Switcher Bar - 4 Colunas Perfeitas sem overflow */
-        .tab-bar {
+        /* Barra de Abas Inferior Fixa (Polegar Mobile) */
+        .bottom-tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(10, 15, 28, 0.94);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            background: rgba(15, 23, 42, 0.92);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 4px;
+            padding: 6px 12px max(8px, env(safe-area-inset-bottom));
             gap: 4px;
-            width: 100%;
-            box-sizing: border-box;
-            backdrop-filter: blur(16px);
-            position: sticky;
-            top: 4px;
-            z-index: 30;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            z-index: 100;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+            max-width: 520px;
+            margin: 0 auto;
+            border-radius: 20px 20px 0 0;
         }
 
-        .tab-btn {
+        @media (min-width: 768px) {
+            .bottom-tab-bar {
+                max-width: 600px;
+                bottom: 12px;
+                border-radius: 24px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                padding: 6px 12px;
+            }
+        }
+
+        .bottom-tab-btn {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 5px;
-            padding: 10px 4px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: #94a3b8;
-            border: none;
+            gap: 3px;
+            padding: 6px 2px;
+            min-height: 48px;
             background: transparent;
+            border: none;
+            border-radius: 12px;
+            color: #64748b;
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            min-width: 0;
+            user-select: none;
+            outline: none;
         }
 
-        .tab-btn svg {
-            width: 18px;
-            height: 18px;
-            flex-shrink: 0;
+        .bottom-tab-btn svg {
+            width: 22px;
+            height: 22px;
+            stroke-width: 2.2;
+            transition: transform 0.2s, stroke 0.2s;
         }
 
-        .tab-btn span:last-child {
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .bottom-tab-btn .tab-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
             white-space: nowrap;
         }
 
-        .tab-btn.active {
-            background: rgba(37, 99, 235, 0.4);
-            border: 1px solid rgba(59, 130, 246, 0.5);
-            color: #ffffff;
-            box-shadow: 0 2px 12px rgba(37, 99, 235, 0.4);
+        .bottom-tab-btn:hover {
+            color: #94a3b8;
         }
 
-        @media (max-width: 380px) {
-            .tab-btn {
-                flex-direction: column;
-                gap: 3px;
-                padding: 8px 2px;
-                font-size: 0.72rem;
-            }
-            .tab-btn svg {
-                width: 16px;
-                height: 16px;
-            }
+        .bottom-tab-btn.active {
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.12);
+        }
+
+        .bottom-tab-btn.active svg {
+            stroke: #60a5fa;
+            transform: scale(1.08);
+        }
+
+        .bottom-tab-btn:active {
+            transform: scale(0.92);
         }
 
         /* Content Views */
@@ -642,15 +673,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             width: 100%;
-            height: calc(100dvh - 110px);
-            min-height: 360px;
+            flex: 1;
+            min-height: 0;
             gap: 8px;
             box-sizing: border-box;
         }
 
         .touchpad-surface {
             flex: 1;
-            min-height: 180px;
+            min-height: 220px;
             background: rgba(19, 26, 42, 0.72);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
@@ -1116,7 +1147,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .modal-btn-cancel { background: rgba(255, 255, 255, 0.08); color: #cbd5e1; }
         .modal-btn-confirm { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4); }
 
-        /* Volume Widget (Sticky no topo da aba) */
+        /* Volume Widget (Integrado na aba de controles sem sticky quebradiço) */
         .volume-widget {
             display: flex;
             align-items: center;
@@ -1130,9 +1161,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             box-sizing: border-box;
             backdrop-filter: blur(16px);
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-            position: sticky;
-            top: 54px;
-            z-index: 25;
+            position: relative;
+            z-index: 10;
         }
 
         .vol-mute-btn {
@@ -1203,29 +1233,63 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             font-variant-numeric: tabular-nums;
         }
 
-        /* Keyboard Box in Touchpad */
-        .keyboard-box {
-            margin-top: 8px;
+        /* Keyboard Collapsible Box in Touchpad */
+        .keyboard-collapsible {
             display: flex;
             flex-direction: column;
-            gap: 6px;
             width: 100%;
+            gap: 6px;
+        }
+
+        .keyboard-toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            min-height: 44px;
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #cbd5e1;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .keyboard-toggle-btn:active {
+            background: rgba(30, 41, 59, 0.95);
+        }
+
+        .keyboard-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 10px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
         }
 
         .keyboard-input-row {
             display: flex;
-            gap: 6px;
+            gap: 8px;
             width: 100%;
         }
 
         .keyboard-input-row input {
             flex: 1;
-            background: rgba(15, 23, 42, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 10px;
-            padding: 8px 12px;
+            background: rgba(2, 6, 23, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 12px;
+            padding: 12px 14px;
             color: #ffffff;
-            font-size: 0.82rem;
+            font-size: 16px; /* Essencial para evitar auto-zoom no iOS Safari */
+            min-height: 44px;
             outline: none;
             font-family: inherit;
         }
@@ -1239,9 +1303,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             background: linear-gradient(135deg, #2563eb, #3b82f6);
             border: none;
             color: white;
-            padding: 8px 14px;
-            border-radius: 10px;
-            font-size: 0.78rem;
+            padding: 12px 16px;
+            min-height: 44px;
+            min-width: 60px;
+            border-radius: 12px;
+            font-size: 0.88rem;
             font-weight: 700;
             cursor: pointer;
             box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
@@ -1252,30 +1318,172 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .keyboard-quick-keys {
             display: flex;
-            gap: 5px;
+            gap: 6px;
             width: 100%;
         }
 
         .quick-key {
             flex: 1;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 6px 2px;
-            color: #cbd5e1;
-            font-size: 0.72rem;
+            min-height: 44px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 4px;
+            color: #f1f5f9;
+            font-size: 0.88rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease;
             text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .quick-key:active {
-            background: rgba(59, 130, 246, 0.25);
+            background: rgba(59, 130, 246, 0.3);
+            border-color: #3b82f6;
             color: #ffffff;
             transform: scale(0.95);
         }
 
+        /* D-Pad e Controles da TV */
+        .dpad-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 18px 0;
+            width: 100%;
+        }
+
+        .dpad-cross {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 2px 10px rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+        }
+
+        .dpad-btn {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.12s ease;
+            outline: none;
+        }
+
+        .dpad-btn:active {
+            background: rgba(59, 130, 246, 0.4);
+            border-color: #3b82f6;
+            color: #ffffff;
+            transform: scale(0.94);
+        }
+
+        .dpad-up {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 52px;
+            border-radius: 18px 18px 8px 8px;
+        }
+
+        .dpad-down {
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 52px;
+            border-radius: 8px 8px 18px 18px;
+        }
+
+        .dpad-left {
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 52px;
+            height: 60px;
+            border-radius: 18px 8px 8px 18px;
+        }
+
+        .dpad-right {
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 52px;
+            height: 60px;
+            border-radius: 8px 18px 18px 8px;
+        }
+
+        .dpad-ok {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 800;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .dpad-ok:active {
+            transform: translate(-50%, -50%) scale(0.92);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.6);
+        }
+
+        .tv-actions-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .tv-nav-btn {
+            flex: 1;
+            min-height: 48px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            color: #f1f5f9;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .tv-nav-btn:active {
+            transform: scale(0.96);
+            background: rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
         </style>
 
 </head>
@@ -1296,22 +1504,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
             </div>
         </header>
-
-        <!-- Segmented Tab Bar -->
-        <nav class="tab-bar">
-            <button class="tab-btn active" id="tab-controls" onclick="switchTab('controls')">
-                <span>🎬</span> Controles
-            </button>
-            <button class="tab-btn" id="tab-touchpad" onclick="switchTab('touchpad')">
-                <span>🖱️</span> Touchpad
-            </button>
-            <button class="tab-btn" id="tab-timer" onclick="switchTab('timer')">
-                <span>⏱️</span> Sleep
-            </button>
-            <button class="tab-btn" id="tab-tv" onclick="switchTab('tv')">
-                <span>📺</span> TV
-            </button>
-        </nav>
 
         <div class="tab-views-container">
             <!-- ABA 1: CONTROLES DE STREAMING / NETFLIX -->
@@ -1391,17 +1583,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <button class="mouse-btn mouse-btn-left" onclick="sendMouseClick(1)">Clique Esquerdo</button>
                         <button class="mouse-btn mouse-btn-right" onclick="sendMouseClick(3)">Clique Direito</button>
                     </div>
-                    <!-- Digitação Rápida / Teclado no PC -->
-                    <div class="keyboard-box">
-                        <form onsubmit="enviarTextoDigitado(event)" class="keyboard-input-row">
-                            <input type="text" id="keyboardInput" placeholder="Digitar no PC (ex: busca YouTube)..." autocomplete="off">
-                            <button type="submit" class="keyboard-send-btn">Enviar</button>
-                        </form>
-                        <div class="keyboard-quick-keys">
-                            <button type="button" class="quick-key" onclick="enviarTecla('Return')">↵ Enter</button>
-                            <button type="button" class="quick-key" onclick="enviarTecla('BackSpace')">⌫ Apagar</button>
-                            <button type="button" class="quick-key" onclick="enviarTecla('space')">␣ Espaço</button>
-                            <button type="button" class="quick-key" onclick="enviarTecla('Escape')">Esc</button>
+                    <!-- Digitação Rápida / Teclado no PC (Painel Recolhível) -->
+                    <div class="keyboard-collapsible">
+                        <button type="button" class="keyboard-toggle-btn" id="btnToggleKeyboard" onclick="toggleKeyboardPanel()">
+                            <span>⌨️ Digitar no PC</span>
+                            <span id="keyboardToggleIcon">▼</span>
+                        </button>
+                        <div class="keyboard-box" id="keyboardBox" style="display: none;">
+                            <form onsubmit="enviarTextoDigitado(event)" class="keyboard-input-row">
+                                <input type="text" id="keyboardInput" placeholder="Digitar no PC (ex: busca YouTube)..." autocomplete="off">
+                                <button type="submit" class="keyboard-send-btn">Enviar</button>
+                            </form>
+                            <div class="keyboard-quick-keys">
+                                <button type="button" class="quick-key" onclick="enviarTecla('Return')">↵ Enter</button>
+                                <button type="button" class="quick-key" onclick="enviarTecla('BackSpace')">⌫ Apagar</button>
+                                <button type="button" class="quick-key" onclick="enviarTecla('space')">␣ Espaço</button>
+                                <button type="button" class="quick-key" onclick="enviarTecla('Escape')">Esc</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1449,50 +1647,68 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <span>📺</span>
                             <span>Android TV Remote</span>
                         </div>
-                        <div class="tv-device-info">Dispositivo: 192.168.15.5</div>
+                        <div class="tv-device-info">Dispositivo: {{ config.get('tv_ip', '192.168.1.100') }}</div>
                     </div>
 
-                    <div class="grid-controls">
-                        {% for botao in config.botoes %}
-                        {% if botao.get('ativo', True) and botao.get('tag') == 'TV' %}
-                        <button class="ctrl-btn cor-{{ botao.get('cor', 'cyan') }} largura-{{ botao.get('largura', 'metade') }}"
-                                id="btn-{{ botao.id }}"
-                                onclick="{% if botao.get('confirmar') %}abrirConfirmacao('{{ botao.id }}', '{{ botao.label }}', '{{ botao.get('sub', '') }}'){% else %}executar('{{ botao.id }}', '{{ botao.label }}'){% endif %}">
-                            
-                            {% if botao.get('largura') == 'cheia' %}
-                            <div class="main-content">
-                                <div class="ctrl-icon">
-                                    {{ icones.get(botao.get('icone'), icones['default']) | safe }}
-                                </div>
-                                <div class="ctrl-text">
-                                    <span class="ctrl-title">{{ botao.label }}</span>
-                                    {% if botao.get('sub') %}
-                                    <span class="ctrl-sub">{{ botao.sub }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% if botao.get('tag') %}
-                            <span class="pill-tag">{{ botao.tag }}</span>
-                            {% endif %}
+                    <!-- D-Pad Direcional Real -->
+                    <div class="dpad-container">
+                        <div class="dpad-cross">
+                            <button type="button" class="dpad-btn dpad-up" onclick="executar('tv-up', 'Cima')" aria-label="Cima">▲</button>
+                            <button type="button" class="dpad-btn dpad-left" onclick="executar('tv-left', 'Esquerda')" aria-label="Esquerda">◀</button>
+                            <button type="button" class="dpad-btn dpad-ok" onclick="executar('tv-ok', 'OK')" aria-label="OK">OK</button>
+                            <button type="button" class="dpad-btn dpad-right" onclick="executar('tv-right', 'Direita')" aria-label="Direita">▶</button>
+                            <button type="button" class="dpad-btn dpad-down" onclick="executar('tv-down', 'Baixo')" aria-label="Baixo">▼</button>
+                        </div>
+                    </div>
 
-                            {% else %}
-                            <div class="ctrl-icon">
-                                {{ icones.get(botao.get('icone'), icones['default']) | safe }}
-                            </div>
-                            <div class="ctrl-text">
-                                <span class="ctrl-title">{{ botao.label }}</span>
-                                {% if botao.get('sub') %}
-                                <span class="ctrl-sub">{{ botao.sub }}</span>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                        </button>
-                        {% endif %}
-                        {% endfor %}
+                    <!-- Teclas de Navegação da TV -->
+                    <div class="tv-actions-row">
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-back', 'Voltar')">↩ Voltar</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-home', 'Início')">🏠 Início</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-play', 'Play/Pause')">⏯️ Play</button>
+                    </div>
+
+                    <!-- Controle de Volume e Energia da TV -->
+                    <div class="tv-actions-row">
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-vol-down', 'TV Vol -')">🔉 Vol -</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-vol-up', 'TV Vol +')">🔊 Vol +</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-power', 'TV Power')">⏻ Power</button>
                     </div>
                 </div>
             </section>
         </div>
+
+        <!-- Barra de Abas Inferior Fixa (Polegar Mobile) -->
+        <nav class="bottom-tab-bar" aria-label="Navegação Principal">
+            <button class="bottom-tab-btn active" id="tab-controls" onclick="switchTab('controls')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="2" y="2" width="20" height="20" rx="4"></rect>
+                    <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+                </svg>
+                <span class="tab-label">Controles</span>
+            </button>
+            <button class="bottom-tab-btn" id="tab-touchpad" onclick="switchTab('touchpad')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="5" y="2" width="14" height="20" rx="7"></rect>
+                    <line x1="12" y1="6" x2="12" y2="10"></line>
+                </svg>
+                <span class="tab-label">Touchpad</span>
+            </button>
+            <button class="bottom-tab-btn" id="tab-timer" onclick="switchTab('timer')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span class="tab-label">Sleep</span>
+            </button>
+            <button class="bottom-tab-btn" id="tab-tv" onclick="switchTab('tv')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="2" y="7" width="20" height="15" rx="2"></rect>
+                    <polyline points="17 2 12 7 7 2"></polyline>
+                </svg>
+                <span class="tab-label">TV</span>
+            </button>
+        </nav>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -1599,11 +1815,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         // Sistema de Abas
         function switchTab(tabId) {
             if (navigator.vibrate) navigator.vibrate(20);
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.bottom-tab-btn, .tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-view').forEach(view => view.classList.remove('active'));
 
-            document.getElementById(`tab-${tabId}`).classList.add('active');
-            document.getElementById(`view-${tabId}`).classList.add('active');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            if (activeBtn) activeBtn.classList.add('active');
+            const activeView = document.getElementById(`view-${tabId}`);
+            if (activeView) activeView.classList.add('active');
 
             if (tabId === 'touchpad') {
                 document.body.classList.add('touchpad-active');
@@ -1615,6 +1833,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 checkTimerStatus();
             } else if (tabId === 'controls') {
                 carregarVolume();
+            }
+        }
+
+        // Toggle Painel de Teclado
+        function toggleKeyboardPanel() {
+            const kb = document.getElementById('keyboardBox');
+            const icon = document.getElementById('keyboardToggleIcon');
+            if (!kb) return;
+            const isHidden = (kb.style.display === 'none' || !kb.style.display);
+            if (isHidden) {
+                kb.style.display = 'flex';
+                if (icon) icon.textContent = '▲';
+                const input = document.getElementById('keyboardInput');
+                if (input) setTimeout(() => input.focus(), 100);
+            } else {
+                kb.style.display = 'none';
+                if (icon) icon.textContent = '▼';
             }
         }
 
@@ -1800,6 +2035,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const rect = touchpad.getBoundingClientRect();
             const t = e.touches[0];
             const inScrollStrip = (t.clientX >= rect.right - 54);
+            const isTwo = (e.touches.length >= 2) || isTwoFinger;
 
             const dx = (t.clientX - lastX) * 1.5;
             const dy = (t.clientY - lastY) * 1.5;
@@ -1811,7 +2047,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
 
             // Modo Rolagem (Barra lateral ou 2 dedos)
-            if (inScrollStrip || isTwoFinger) {
+            if (inScrollStrip || isTwo) {
                 scrollAccum += dy;
                 if (Math.abs(scrollAccum) >= 8) {
                     const dir = scrollAccum < 0 ? 1 : -1;
@@ -1833,7 +2069,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const elapsed = Date.now() - startTime;
             if (!isTouchMoving && elapsed < 260) {
                 if (navigator.vibrate) navigator.vibrate(25);
-                if (isTwoFinger) {
+                if (isTwoFinger || (e.changedTouches && e.changedTouches.length >= 2)) {
                     sendMouseClick(3); // botão direito
                 } else {
                     sendMouseClick(1); // clique esquerdo
@@ -1841,6 +2077,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
             isTouchMoving = false;
             isTwoFinger = false;
+        });
+
+        touchpad.addEventListener('touchcancel', () => {
+            isTouchMoving = false;
+            isTwoFinger = false;
+            accumDX = 0;
+            accumDY = 0;
+            scrollAccum = 0;
         });
 
         async function sendMouseClick(btn) {
