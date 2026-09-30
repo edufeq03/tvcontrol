@@ -29,4 +29,11 @@ ignocontrol.desktop
 # Testes e cobertura
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+
+# Logs e estado de execução local
+audit.log
+*.log
+timer_state.json
+
