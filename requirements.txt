@@ -8,3 +8,4 @@ itsdangerous==2.2.0
 click==8.1.8
 blinker==1.8.2
 MarkupSafe==2.1.5
+waitress==3.0.0

@@ -7,10 +7,28 @@ import time
 import qrcode
 from tvcontrol.services import ENV
 from tvcontrol.auth import log_audit
-from tvcontrol.config import PROJECT_ROOT
+import json
+from tvcontrol.config import PROJECT_ROOT, USER_CONFIG_DIR
+
+TIMER_STATE_PATH = os.path.join(USER_CONFIG_DIR, "timer_state.json")
 
 timer_lock = threading.Lock()
 timer_target = None
+
+def _salvar_estado_timer(target):
+    try:
+        os.makedirs(USER_CONFIG_DIR, exist_ok=True)
+        with open(TIMER_STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump({"target": target}, f)
+    except Exception:
+        pass
+
+def _limpar_estado_timer():
+    try:
+        if os.path.exists(TIMER_STATE_PATH):
+            os.remove(TIMER_STATE_PATH)
+    except Exception:
+        pass
 
 def timer_worker(target_timestamp):
     while True:
@@ -20,6 +38,7 @@ def timer_worker(target_timestamp):
                 return
             if time.time() >= target_timestamp:
                 break
+    _limpar_estado_timer()
     try:
         log_audit("warning", "Temporizador finalizado: executando desligamento do sistema")
         executar_desligamento()
@@ -31,6 +50,7 @@ def set_timer(minutes):
     with timer_lock:
         target = time.time() + (minutes * 60)
         timer_target = target
+        _salvar_estado_timer(target)
         th = threading.Thread(target=timer_worker, args=(target,), daemon=True)
         th.start()
     return minutes * 60
@@ -39,12 +59,36 @@ def cancel_timer():
     global timer_target
     with timer_lock:
         timer_target = None
+        _limpar_estado_timer()
 
 def get_timer_status():
     with timer_lock:
         if timer_target and timer_target > time.time():
             return True, int(timer_target - time.time())
         return False, 0
+
+def restaurar_timer():
+    """
+    Restaura timer ativo persistido em disco após reinício do serviço.
+    """
+    global timer_target
+    if os.path.exists(TIMER_STATE_PATH):
+        try:
+            with open(TIMER_STATE_PATH, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+                target = dados.get("target")
+                if target and target > time.time():
+                    with timer_lock:
+                        timer_target = target
+                        th = threading.Thread(target=timer_worker, args=(target,), daemon=True)
+                        th.start()
+                else:
+                    _limpar_estado_timer()
+        except Exception:
+            _limpar_estado_timer()
+
+# Tenta restaurar timer persistido no startup
+restaurar_timer()
 
 def executar_desligamento():
     """

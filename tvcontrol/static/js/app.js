@@ -433,3 +433,39 @@ const urlParams = new URLSearchParams(window.location.search);
                 executar(btnId, label);
             }
         });
+
+        // ==========================================
+        // 💓 MONITORAMENTO DE CONEXÃO EM TEMPO REAL
+        // ==========================================
+        let wasOffline = false;
+        function checkConnection() {
+            const dot = document.getElementById('connStatusDot');
+            const txt = document.getElementById('connStatusText');
+            if (!dot || !txt) return;
+
+            fetch('/ping', { credentials: 'same-origin', cache: 'no-store' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.status === 'ok') {
+                        dot.style.background = '#22c55e';
+                        dot.style.boxShadow = '0 0 8px rgba(34, 197, 94, 0.6)';
+                        txt.textContent = 'Online';
+                        if (wasOffline) {
+                            showToast('🟢 Reconectado ao servidor!');
+                            wasOffline = false;
+                        }
+                    } else {
+                        throw new Error('Invalid response');
+                    }
+                })
+                .catch(() => {
+                    dot.style.background = '#ef4444';
+                    dot.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.6)';
+                    txt.textContent = 'Offline';
+                    if (!wasOffline) {
+                        showToast('⚠️ Conexão perdida. Tentando reconectar...');
+                        wasOffline = true;
+                    }
+                });
+        }
+        setInterval(checkConnection, 4000);

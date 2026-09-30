@@ -70,7 +70,7 @@ def create_app(test_config=None):
         public_endpoints = {
             'main.index', 'main.rota_login', 'main.rota_logout',
             'main.rota_qrcode', 'main.app_icon', 'main.manifest', 'main.favicon',
-            'static'
+            'main.ping', 'static'
         }
         if request.endpoint in public_endpoints:
             return None

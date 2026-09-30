@@ -152,6 +152,34 @@ Todas as requisições autenticam via query param `?token=...`, header `X-Token`
 
 ---
 
+---
+
+## 🧪 Testes Automatizados e CI
+
+O IgnoControl conta com cobertura de testes automatizados com `pytest` e pipeline de CI no GitHub Actions:
+
+```bash
+# Executa a suíte de testes com relatório de cobertura
+./venv/bin/pytest --cov=tvcontrol --cov-report=term-missing tests/
+
+# Análise estática de vulnerabilidades (Bandit)
+./venv/bin/bandit -lll -r tvcontrol remote.py
+```
+
+---
+
+## 🔒 Política de Segurança
+
+Para detalhes do modelo de ameaças, autenticação e reporte de vulnerabilidades, consulte [SECURITY.md](SECURITY.md).
+
+---
+
+## 📜 Histórico de Alterações
+
+Todas as melhorias por sprint e notas de versão estão documentadas em [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## 🗑️ Desinstalação
 
 Para remover atalhos, serviços e configurações automáticas:

@@ -1,4 +1,5 @@
 import io
+import time
 import qrcode
 from flask import Blueprint, render_template, request, jsonify, abort, send_from_directory, send_file, redirect
 from tvcontrol.config import carregar_config, ICONES_SVG, PROJECT_ROOT
@@ -138,3 +139,7 @@ def manifest():
 @main_bp.route('/favicon.ico')
 def favicon():
     return ('', 204)
+
+@main_bp.route('/ping')
+def ping():
+    return jsonify({"status": "ok", "time": time.time()})

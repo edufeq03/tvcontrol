@@ -12,11 +12,7 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/icon.png">
     <link rel="apple-touch-icon" href="/icon.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-</head>
 </head>
 <body>
     <div class="wrapper">
@@ -29,9 +25,9 @@
                     <span>📱</span>
                     <span>Conectar</span>
                 </button>
-                <div class="status-badge">
-                    <span class="status-dot"></span>
-                    <span>Online</span>
+                <div class="status-badge" id="connStatusBadge">
+                    <span class="status-dot" id="connStatusDot"></span>
+                    <span id="connStatusText">Online</span>
                 </div>
             </div>
         </header>
@@ -287,5 +283,12 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+            });
+        }
+    </script>
 </body>
 </html>

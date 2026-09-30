@@ -1,3 +1,5 @@
+import os
+import shutil
 import subprocess
 from tvcontrol.services import ENV
 
@@ -12,15 +14,42 @@ EVDEV_KEYMAP = {
     "Page_Up": 104, "Page_Down": 109, "Home": 102, "End": 107
 }
 
+_BACKEND = None
+
+def detectar_backend():
+    """
+    Detecta uma única vez o backend disponível (ydotool em Wayland vs xdotool em X11)
+    para evitar duplo spawn de processos a cada evento de entrada.
+    """
+    global _BACKEND
+    if _BACKEND is not None:
+        return _BACKEND
+
+    sock = os.environ.get("YDOTOOL_SOCKET", "/tmp/.ydotool_socket")
+    if os.path.exists(sock) and shutil.which("ydotool"):
+        _BACKEND = "ydotool"
+        return _BACKEND
+
+    if shutil.which("xdotool") and os.environ.get("DISPLAY"):
+        _BACKEND = "xdotool"
+        return _BACKEND
+
+    if shutil.which("ydotool"):
+        _BACKEND = "ydotool"
+        return _BACKEND
+
+    _BACKEND = "xdotool"
+    return _BACKEND
+
 def mover_mouse(dx, dy):
-    # 1. Tenta ydotool (Wayland)
-    try:
-        res = subprocess.run(["ydotool", "mousemove", "--", str(dx), str(dy)], env=ENV, capture_output=True)
-        if res.returncode == 0:
-            return True
-    except Exception:
-        pass
-    # 2. Fallback para xdotool (X11)
+    backend = detectar_backend()
+    if backend == "ydotool":
+        try:
+            res = subprocess.run(["ydotool", "mousemove", "--", str(dx), str(dy)], env=ENV, capture_output=True)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
     try:
         subprocess.run(["xdotool", "mousemove_relative", "--", str(dx), str(dy)], env=ENV, capture_output=True)
         return True
@@ -28,20 +57,20 @@ def mover_mouse(dx, dy):
         return False
 
 def clicar_mouse(botao):
-    # 1. Tenta ydotool
-    try:
-        if str(botao) == "1":
-            args = ["-D", "25", "0x40", "0x80"]
-        elif str(botao) == "2":
-            args = ["-D", "25", "0x42", "0x82"]
-        else:  # 3 (direito)
-            args = ["-D", "25", "0x41", "0x81"]
-        res = subprocess.run(["ydotool", "click"] + args, env=ENV, capture_output=True)
-        if res.returncode == 0:
-            return True
-    except Exception:
-        pass
-    # 2. Fallback para xdotool
+    backend = detectar_backend()
+    if backend == "ydotool":
+        try:
+            if str(botao) == "1":
+                args = ["-D", "25", "0x40", "0x80"]
+            elif str(botao) == "2":
+                args = ["-D", "25", "0x42", "0x82"]
+            else:
+                args = ["-D", "25", "0x41", "0x81"]
+            res = subprocess.run(["ydotool", "click"] + args, env=ENV, capture_output=True)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
     try:
         subprocess.run(["xdotool", "click", str(botao)], env=ENV, capture_output=True)
         return True
@@ -49,13 +78,15 @@ def clicar_mouse(botao):
         return False
 
 def rolar_mouse(delta):
-    try:
-        w_val = "1" if delta > 0 else "-1"
-        res = subprocess.run(["ydotool", "mousemove", "-w", "--", "0", w_val], env=ENV, capture_output=True)
-        if res.returncode == 0:
-            return True
-    except Exception:
-        pass
+    backend = detectar_backend()
+    if backend == "ydotool":
+        try:
+            w_val = "1" if delta > 0 else "-1"
+            res = subprocess.run(["ydotool", "mousemove", "-w", "--", "0", w_val], env=ENV, capture_output=True)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
     btn = "4" if delta > 0 else "5"
     try:
         subprocess.run(["xdotool", "click", btn], env=ENV, capture_output=True)

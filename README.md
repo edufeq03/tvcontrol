@@ -187,6 +187,32 @@ All endpoints expect token authentication via `?token=<TOKEN>`, `X-Token: <TOKEN
 
 ---
 
+## 🧪 Testing & CI Automation
+
+IgnoControl includes an automated test suite with over 70% coverage and GitHub Actions CI:
+
+```bash
+# Run automated test suite with coverage
+./venv/bin/pytest --cov=tvcontrol --cov-report=term-missing tests/
+
+# Run security static analysis (Bandit)
+./venv/bin/bandit -lll -r tvcontrol remote.py
+```
+
+---
+
+## 🔒 Security Policy
+
+For security vulnerability reporting, threat modeling, and defense-in-depth details, see [SECURITY.md](SECURITY.md).
+
+---
+
+## 📜 Changelog
+
+All release notes and sprint implementations are documented in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## 🗑️ Uninstallation
 
 To remove all created shortcuts, services, and system configurations cleanly:

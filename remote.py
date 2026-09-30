@@ -60,7 +60,15 @@ def main():
         threading.Timer(0.8, lambda: webbrowser.open(local_url)).start()
 
     bind_host = cfg.get("bind_host", "0.0.0.0")
-    app.run(host=bind_host, port=porta, ssl_context=ssl_context)
+    if "--debug" in sys.argv:
+        app.run(host=bind_host, port=porta, ssl_context=ssl_context, debug=True)
+    else:
+        try:
+            import waitress
+            print(f"🚀 Servidor de produção Waitress ativo em http://{bind_host}:{porta}")
+            waitress.serve(app, host=bind_host, port=porta, threads=6)
+        except ImportError:
+            app.run(host=bind_host, port=porta, ssl_context=ssl_context)
 
 if __name__ == '__main__':
     main()
