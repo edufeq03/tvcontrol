@@ -266,6 +266,11 @@ ExecStart=${VENV_DIR}/bin/python ${SCRIPT_DIR}/remote.py --no-browser
 Restart=always
 RestartSec=2
 Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.config/ignocontrol
 
 [Install]
 WantedBy=default.target

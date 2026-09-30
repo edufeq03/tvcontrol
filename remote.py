@@ -8,19 +8,148 @@ import threading
 import time
 import webbrowser
 import io
-import qrcode
-from flask import Flask, render_template_string, request, jsonify, abort, send_from_directory, send_file, redirect, make_response
+import ipaddress
+import shlex
+import logging
+from logging.handlers import RotatingFileHandler
 import hmac
 import secrets
-
-app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
+import qrcode
+from flask import Flask, render_template_string, request, jsonify, abort, send_from_directory, send_file, redirect, make_response
 
 USER_CONFIG_DIR = os.path.expanduser("~/.config/ignocontrol")
 USER_CONFIG_PATH = os.path.join(USER_CONFIG_DIR, "config.json")
+SECRET_KEY_PATH = os.path.join(USER_CONFIG_DIR, ".secret_key")
+AUDIT_LOG_PATH = os.path.join(USER_CONFIG_DIR, "audit.log")
 LOCAL_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 CONFIG_EXAMPLE_PATH = os.path.join(os.path.dirname(__file__), "config.example.json")
+BASE_DIR = os.path.dirname(__file__)
 
+os.makedirs(USER_CONFIG_DIR, exist_ok=True)
+
+def obter_ou_criar_secret_key():
+    env_secret = os.environ.get("FLASK_SECRET_KEY")
+    if env_secret:
+        return env_secret
+    if os.path.exists(SECRET_KEY_PATH):
+        try:
+            with open(SECRET_KEY_PATH, "r", encoding="utf-8") as f:
+                key = f.read().strip()
+                if len(key) >= 32:
+                    return key
+        except Exception:
+            pass
+    key = secrets.token_hex(32)
+    try:
+        with open(SECRET_KEY_PATH, "w", encoding="utf-8") as f:
+            f.write(key)
+        os.chmod(SECRET_KEY_PATH, 0o600)
+    except Exception:
+        pass
+    return key
+
+app = Flask(__name__)
+app.secret_key = obter_ou_criar_secret_key()
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_NAME'] = 'ignocontrol_session'
+
+# ==========================================
+# 🛡️ AUDITORIA E LOGS ESTRUTURADOS
+# ==========================================
+audit_logger = logging.getLogger("ignocontrol.audit")
+audit_logger.setLevel(logging.INFO)
+if not audit_logger.handlers:
+    try:
+        fh = RotatingFileHandler(AUDIT_LOG_PATH, maxBytes=2*1024*1024, backupCount=3, encoding="utf-8")
+        formatter = logging.Formatter("[%(asctime)s] %(levelname)s [client=%(client_ip)s] %(message)s")
+        fh.setFormatter(formatter)
+        audit_logger.addHandler(fh)
+    except Exception as e:
+        print(f"[AVISO] Não foi possível inicializar audit.log: {e}", file=sys.stderr)
+
+def log_audit(level, message, client_ip=None):
+    ip = client_ip
+    if not ip:
+        try:
+            ip = request.remote_addr or "127.0.0.1"
+        except Exception:
+            ip = "127.0.0.1"
+    extra = {"client_ip": ip}
+    if level == "info":
+        audit_logger.info(message, extra=extra)
+    elif level == "warning":
+        audit_logger.warning(message, extra=extra)
+    elif level == "error":
+        audit_logger.error(message, extra=extra)
+
+# ==========================================
+# 🛑 RATE LIMITING & PROTEÇÃO BRUTE-FORCE
+# ==========================================
+class RateLimiter:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.failed_logins = {} # ip -> [timestamps]
+        self.request_counts = {} # (ip, endpoint) -> [timestamps]
+
+    def is_ip_blocked(self, ip):
+        now = time.time()
+        with self.lock:
+            attempts = [t for t in self.failed_logins.get(ip, []) if now - t < 600]
+            self.failed_logins[ip] = attempts
+            return len(attempts) >= 10
+
+    def record_failed_login(self, ip):
+        now = time.time()
+        with self.lock:
+            attempts = [t for t in self.failed_logins.get(ip, []) if now - t < 600]
+            attempts.append(now)
+            self.failed_logins[ip] = attempts
+
+    def reset_failed_login(self, ip):
+        with self.lock:
+            self.failed_logins.pop(ip, None)
+
+    def check_rate_limit(self, ip, endpoint, max_per_sec=60):
+        now = time.time()
+        with self.lock:
+            key = (ip, endpoint)
+            times = [t for t in self.request_counts.get(key, []) if now - t < 1.0]
+            if len(times) >= max_per_sec:
+                return False
+            times.append(now)
+            self.request_counts[key] = times
+            return True
+
+rate_limiter = RateLimiter()
+
+# ==========================================
+# 🔑 CÓDIGOS DE PAREAMENTO QR (USO ÚNICO)
+# ==========================================
+PAIRING_CODES = {}
+pairing_lock = threading.Lock()
+
+def gerar_codigo_pareamento():
+    now = time.time()
+    with pairing_lock:
+        expired = [k for k, v in PAIRING_CODES.items() if now > v]
+        for k in expired:
+            del PAIRING_CODES[k]
+        code = secrets.token_urlsafe(16)
+        PAIRING_CODES[code] = now + 300 # Válido por 5 minutos
+        return code
+
+def consumir_codigo_pareamento(code):
+    now = time.time()
+    with pairing_lock:
+        if code in PAIRING_CODES and PAIRING_CODES[code] >= now:
+            del PAIRING_CODES[code] # Uso estritamente único!
+            return True
+        return False
+
+# ==========================================
+# ⚙️ CONFIGURAÇÃO E VALIDAÇÃO ESTRITA
+# ==========================================
 def obter_caminho_config():
     if os.path.exists(USER_CONFIG_PATH):
         return USER_CONFIG_PATH
@@ -29,7 +158,6 @@ def obter_caminho_config():
     return USER_CONFIG_PATH
 
 CONFIG_PATH = obter_caminho_config()
-BASE_DIR = os.path.dirname(__file__)
 
 ICONES_SVG = {
     "play": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon></svg>',
@@ -56,6 +184,43 @@ def salvar_config(dados, path=None):
         os.chmod(caminho, 0o600)
     except Exception:
         pass
+
+def validar_config(cfg):
+    """
+    Validação estrutural estrita da configuração.
+    Recusa iniciar com token fraco ou configuração corrompida.
+    """
+    if not isinstance(cfg, dict):
+        raise ValueError("Configuração deve ser um objeto JSON.")
+    
+    token = str(cfg.get("token", "")).strip()
+    if not token or token in ("minhachave123", "COLOQUE_UM_TOKEN_SEGURO_AQUI"):
+        raise ValueError("Token inválido ou padrão comprometido detectado.")
+    
+    porta = cfg.get("porta", 7000)
+    if not isinstance(porta, int) or porta < 1 or porta > 65535:
+        raise ValueError(f"Porta inválida: {porta}. Deve ser um inteiro entre 1 e 65535.")
+    
+    tv_ip = cfg.get("tv_ip")
+    if tv_ip:
+        try:
+            ipaddress.ip_address(tv_ip)
+        except ValueError:
+            raise ValueError(f"IP da TV inválido: {tv_ip}")
+            
+    botoes = cfg.get("botoes", [])
+    if not isinstance(botoes, list):
+        raise ValueError("O campo 'botoes' deve ser uma lista.")
+    
+    for i, btn in enumerate(botoes):
+        if not isinstance(btn, dict):
+            raise ValueError(f"Botão no índice {i} deve ser um objeto.")
+        btn_id = btn.get("id")
+        if not btn_id or not isinstance(btn_id, str):
+            raise ValueError(f"Botão no índice {i} possui ID inválido.")
+        if not re.match(r'^[a-zA-Z0-9_\-]+$', btn_id):
+            raise ValueError(f"ID do botão contém caracteres inválidos: {btn_id}")
+    return True
 
 def carregar_config():
     global CONFIG_PATH
@@ -124,6 +289,36 @@ for s_path in [os.environ.get("YDOTOOL_SOCKET"), "/tmp/.ydotool_socket", f"/run/
 else:
     ENV["YDOTOOL_SOCKET"] = "/tmp/.ydotool_socket"
 
+# ==========================================
+# ⚡ EXECUÇÃO DE COMANDOS SEM SHELL (shell=False)
+# ==========================================
+def executar_comando_seguro(cmd_spec):
+    """
+    Executa comandos de forma segura SEM shell=True.
+    cmd_spec pode ser uma lista de argumentos (ex: ['playerctl', 'play-pause'])
+    ou uma string. Se contiver '||', tenta cada alternativa em sequência com shlex.split.
+    """
+    if isinstance(cmd_spec, list):
+        try:
+            res = subprocess.run(cmd_spec, env=ENV, timeout=5, capture_output=True)
+            return res.returncode == 0
+        except Exception as e:
+            log_audit("error", f"Falha ao executar comando em lista: {e}")
+            return False
+
+    subcmds = [s.strip() for s in str(cmd_spec).split("||") if s.strip()]
+    for sub in subcmds:
+        try:
+            args = shlex.split(sub)
+            if not args:
+                continue
+            res = subprocess.run(args, env=ENV, timeout=5, capture_output=True)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
+    return False
+
 # Gerenciamento de Temporizador (Sleep Mode)
 timer_lock = threading.Lock()
 timer_target = None
@@ -137,11 +332,12 @@ def timer_worker(target_timestamp):
             if time.time() >= target_timestamp:
                 break
     try:
-        res = subprocess.run(["systemctl", "poweroff"], env=ENV)
+        log_audit("warning", "Temporizador finalizado: executando desligamento do sistema")
+        res = subprocess.run(["systemctl", "poweroff"], env=ENV, timeout=5, capture_output=True)
         if res.returncode != 0:
-            subprocess.run(["sudo", "poweroff"])
-    except Exception:
-        subprocess.run(["sudo", "poweroff"])
+            subprocess.run(["systemctl", "--user", "poweroff"], env=ENV, timeout=5, capture_output=True)
+    except Exception as e:
+        log_audit("error", f"Erro no desligamento pelo temporizador: {e}")
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="pt-BR">
@@ -2341,9 +2537,47 @@ def usuario_autenticado(cfg):
 
     return False
 
+# ==========================================
+# 🛡️ CABEÇALHOS DE SEGURANÇA E FILTROS HTTP
+# ==========================================
+@app.after_request
+def apply_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    )
+    return response
+
 @app.before_request
-def check_auth():
-    # Rotas públicas ou com verificação própria de autenticação/origem
+def security_and_auth_filter():
+    # 1. Validar Host header para mitigar DNS Rebinding attacks
+    host_header = request.host.split(':')[0]
+    local_ip = obter_ip_local()
+    is_valid_host = (
+        host_header in ('localhost', '127.0.0.1', '::1', local_ip) or
+        host_header.startswith('192.168.') or
+        host_header.startswith('10.') or
+        (host_header.startswith('172.') and 16 <= int(host_header.split('.')[1]) <= 31 if host_header.replace('.', '').isdigit() and len(host_header.split('.')) == 4 else False)
+    )
+    if not is_valid_host:
+        log_audit("warning", f"Tentativa de DNS Rebinding ou Host header não autorizado: {request.host}")
+        abort(400)
+
+    # 2. Rate limiting em endpoints de alta frequência
+    client_ip = request.remote_addr or '127.0.0.1'
+    if request.path in ('/mouse/move', '/mouse/scroll', '/key', '/type'):
+        if not rate_limiter.check_rate_limit(client_ip, request.path, max_per_sec=60):
+            return jsonify({"status": "error", "message": "Taxa de requisições excedida"}), 429
+
+    # 3. Rotas públicas ou com verificação própria de autenticação/origem
     if request.endpoint in ('index', 'rota_login', 'rota_logout', 'rota_qrcode', 'static', 'favicon', 'manifest', 'app_icon'):
         return None
     
@@ -2351,18 +2585,48 @@ def check_auth():
     if not usuario_autenticado(cfg):
         abort(401)
 
+# ==========================================
+# 🌐 ROTAS PRINCIPAIS E PAREAMENTO
+# ==========================================
 @app.route('/')
 def index():
     cfg = carregar_config()
+    client_ip = request.remote_addr or '127.0.0.1'
 
-    # Se recebeu token via query string (?token=...), valida, grava cookie e redireciona para URL limpa
-    token_query = request.args.get('token')
-    if token_query:
-        if validar_token(token_query, cfg["token"]):
+    # Se recebeu código de pareamento único (?pair=...)
+    pair_code = request.args.get('pair')
+    if pair_code:
+        if rate_limiter.is_ip_blocked(client_ip):
+            log_audit("warning", "Bloqueio de IP por tentativas excessivas (pair)", client_ip)
+            return jsonify({"status": "error", "message": "Muitas tentativas falhas. Tente novamente mais tarde."}), 429
+
+        if consumir_codigo_pareamento(pair_code):
+            rate_limiter.reset_failed_login(client_ip)
+            log_audit("info", "Pareamento QR de uso único bem-sucedido", client_ip)
             resp = redirect('/')
             resp.set_cookie('ignocontrol_session', cfg["token"], httponly=True, samesite='Lax', max_age=60*60*24*30)
             return resp
         else:
+            rate_limiter.record_failed_login(client_ip)
+            log_audit("warning", "Tentativa com código de pareamento inválido ou expirado", client_ip)
+            return render_template_string(LOGIN_TEMPLATE, erro="Código QR de pareamento expirado ou já utilizado. Gere um novo no computador."), 401
+
+    # Se recebeu token via query string (?token=...)
+    token_query = request.args.get('token')
+    if token_query:
+        if rate_limiter.is_ip_blocked(client_ip):
+            log_audit("warning", "Bloqueio de IP por tentativas excessivas (token)", client_ip)
+            return jsonify({"status": "error", "message": "Muitas tentativas falhas. Tente novamente mais tarde."}), 429
+
+        if validar_token(token_query, cfg["token"]):
+            rate_limiter.reset_failed_login(client_ip)
+            log_audit("info", "Login bem-sucedido via token na URL", client_ip)
+            resp = redirect('/')
+            resp.set_cookie('ignocontrol_session', cfg["token"], httponly=True, samesite='Lax', max_age=60*60*24*30)
+            return resp
+        else:
+            rate_limiter.record_failed_login(client_ip)
+            log_audit("warning", "Tentativa com token inválido na URL", client_ip)
             return render_template_string(LOGIN_TEMPLATE, erro="Token de acesso inválido. Verifique o terminal do PC."), 401
 
     if not usuario_autenticado(cfg):
@@ -2375,13 +2639,24 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def rota_login():
     cfg = carregar_config()
+    client_ip = request.remote_addr or '127.0.0.1'
+
     if request.method == 'POST':
+        if rate_limiter.is_ip_blocked(client_ip):
+            log_audit("warning", "Bloqueio de IP por tentativas excessivas no login", client_ip)
+            return jsonify({"status": "error", "message": "Muitas tentativas falhas. Tente novamente em alguns minutos."}), 429
+
         token = request.form.get('token') or (request.get_json(silent=True) or {}).get('token')
         if validar_token(token, cfg["token"]):
+            rate_limiter.reset_failed_login(client_ip)
+            log_audit("info", "Login bem-sucedido via formulário", client_ip)
             resp = redirect('/')
             resp.set_cookie('ignocontrol_session', cfg["token"], httponly=True, samesite='Lax', max_age=60*60*24*30)
             return resp
-        return render_template_string(LOGIN_TEMPLATE, erro="Token incorreto. Tente novamente."), 401
+        else:
+            rate_limiter.record_failed_login(client_ip)
+            log_audit("warning", "Tentativa de login com senha/token incorreto", client_ip)
+            return render_template_string(LOGIN_TEMPLATE, erro="Token incorreto. Tente novamente."), 401
 
     if usuario_autenticado(cfg):
         return redirect('/')
@@ -2389,6 +2664,7 @@ def rota_login():
 
 @app.route('/logout', methods=['GET', 'POST'])
 def rota_logout():
+    log_audit("info", "Logout do usuário efetuado")
     resp = redirect('/login')
     resp.delete_cookie('ignocontrol_session')
     return resp
@@ -2399,10 +2675,12 @@ def rota_qrcode():
     # Permitido apenas de localhost OU para usuário já autenticado
     is_local = request.remote_addr in ('127.0.0.1', '::1', 'localhost')
     if not (is_local or usuario_autenticado(cfg)):
+        log_audit("warning", "Tentativa de acesso não autorizado a /qrcode")
         abort(401)
 
     ip = obter_ip_local()
-    url = f"http://{ip}:{cfg['porta']}/?token={cfg['token']}"
+    pair_code = gerar_codigo_pareamento()
+    url = f"http://{ip}:{cfg['porta']}/?pair={pair_code}"
     qr = qrcode.QRCode(box_size=8, border=2)
     qr.add_data(url)
     qr.make(fit=True)
@@ -2451,20 +2729,29 @@ def executar_comando(btn_id):
     if btn_id in tv_keys:
         tv_ip = cfg.get("tv_ip", "192.168.1.100")
         try:
-            subprocess.run(["adb", "-s", tv_ip, "shell", "input", "keyevent", tv_keys[btn_id]], timeout=3)
-        except Exception:
-            pass
-        return jsonify({"status": "ok", "id": btn_id})
+            ipaddress.ip_address(tv_ip)
+        except ValueError:
+            log_audit("warning", f"Tentativa de comando TV com IP inválido: {tv_ip}")
+            return jsonify({"status": "error", "message": "IP da TV inválido"}), 400
+
+        sucesso = False
+        try:
+            res = subprocess.run(["adb", "-s", tv_ip, "shell", "input", "keyevent", tv_keys[btn_id]], timeout=3, capture_output=True)
+            sucesso = (res.returncode == 0)
+        except Exception as e:
+            log_audit("warning", f"Falha ao executar ADB na TV ({tv_ip}): {e}")
+
+        log_audit("info", f"Comando TV executado: {btn_id} (sucesso={sucesso})")
+        return jsonify({"status": "ok" if sucesso else "error", "id": btn_id})
 
     for botao in cfg.get("botoes", []):
         if botao.get("id") == btn_id:
             cmd = botao.get("comando")
             if cmd:
-                try:
-                    subprocess.run(cmd, shell=True, env=ENV, timeout=5)
-                except Exception:
-                    pass
-                return jsonify({"status": "ok", "id": btn_id, "label": botao.get("label")})
+                sucesso = executar_comando_seguro(cmd)
+                log_audit("info", f"Comando executado: {btn_id} ({botao.get('label')}) sucesso={sucesso}")
+                return jsonify({"status": "ok" if sucesso else "error", "id": btn_id, "label": botao.get("label")})
+    log_audit("warning", f"Tentativa de executar comando inexistente: {btn_id}")
     abort(404)
 
 def mover_mouse(dx, dy):
@@ -2476,7 +2763,10 @@ def mover_mouse(dx, dy):
     except Exception:
         pass
     # 2. Fallback para xdotool (X11)
-    subprocess.run(["xdotool", "mousemove_relative", "--", str(dx), str(dy)], env=ENV)
+    try:
+        subprocess.run(["xdotool", "mousemove_relative", "--", str(dx), str(dy)], env=ENV, capture_output=True)
+    except Exception:
+        pass
 
 def clicar_mouse(botao):
     # 1. Tenta ydotool (0x40=left down, 0x80=left up; 0x41=right down, 0x81=right up)
@@ -2493,7 +2783,10 @@ def clicar_mouse(botao):
     except Exception:
         pass
     # 2. Fallback para xdotool
-    subprocess.run(["xdotool", "click", str(botao)], env=ENV)
+    try:
+        subprocess.run(["xdotool", "click", str(botao)], env=ENV, capture_output=True)
+    except Exception:
+        pass
 
 def rolar_mouse(delta):
     try:
@@ -2504,7 +2797,10 @@ def rolar_mouse(delta):
     except Exception:
         pass
     btn = "4" if delta > 0 else "5"
-    subprocess.run(["xdotool", "click", btn], env=ENV)
+    try:
+        subprocess.run(["xdotool", "click", btn], env=ENV, capture_output=True)
+    except Exception:
+        pass
 
 # ==========================================
 # 🖱️ ENDPOINTS DO MOUSE / TOUCHPAD
@@ -2555,15 +2851,17 @@ def rota_volume():
         except Exception as e:
             return jsonify({"status": "error", "message": str(e), "volume": 50, "muted": False})
     else:
-        dados = request.get_json() or {}
+        dados = request.get_json(silent=True) or {}
         novo_vol = dados.get('volume')
         mute = dados.get('mute')
         if novo_vol is not None:
             vol_val = max(0, min(150, int(novo_vol)))
-            subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{vol_val}%"], env=ENV, timeout=2)
+            subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{vol_val}%"], env=ENV, timeout=2, capture_output=True)
+            log_audit("info", f"Volume alterado para {vol_val}%")
         if mute is not None:
             cmd = ["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle" if mute == "toggle" else ("yes" if mute else "no")]
-            subprocess.run(cmd, env=ENV, timeout=2)
+            subprocess.run(cmd, env=ENV, timeout=2, capture_output=True)
+            log_audit("info", f"Mudo alterado: {mute}")
         return jsonify({"status": "ok"})
 
 # ==========================================
@@ -2571,11 +2869,14 @@ def rota_volume():
 # ==========================================
 @app.route('/type', methods=['POST'])
 def rota_digitar():
-    dados = request.get_json() or {}
+    dados = request.get_json(silent=True) or {}
     texto = dados.get('text', '')
     press_enter = dados.get('enter', False)
     if not texto and not press_enter:
         return jsonify({"status": "ok"})
+    
+    # Audit log SEM vazar o conteúdo confidencial de senhas ou texto digitado
+    log_audit("info", f"Digitação remota enviada: {len(texto)} caracteres (enter={press_enter})")
     
     sucesso = False
     if texto:
@@ -2587,7 +2888,7 @@ def rota_digitar():
             pass
         if not sucesso:
             try:
-                subprocess.run(["xdotool", "type", "--delay", "10", "--", texto], env=ENV, timeout=3)
+                subprocess.run(["xdotool", "type", "--delay", "10", "--", texto], env=ENV, timeout=3, capture_output=True)
                 sucesso = True
             except Exception:
                 pass
@@ -2596,9 +2897,12 @@ def rota_digitar():
         try:
             res = subprocess.run(["ydotool", "key", "28:1", "28:0"], env=ENV, timeout=2, capture_output=True)
             if res.returncode != 0:
-                subprocess.run(["xdotool", "key", "Return"], env=ENV, timeout=2)
+                subprocess.run(["xdotool", "key", "Return"], env=ENV, timeout=2, capture_output=True)
         except Exception:
-            subprocess.run(["xdotool", "key", "Return"], env=ENV, timeout=2)
+            try:
+                subprocess.run(["xdotool", "key", "Return"], env=ENV, timeout=2, capture_output=True)
+            except Exception:
+                pass
 
     return jsonify({"status": "ok"})
 
@@ -2612,25 +2916,16 @@ def rota_tecla():
     dados = request.get_json(silent=True) or {}
     tecla = dados.get('key') or request.args.get('key', '')
     if not tecla or tecla not in ALLOWED_KEYS:
+        log_audit("warning", f"Tentativa de envio de tecla não permitida: {tecla}")
         return jsonify({"status": "error", "message": "Tecla inválida ou não permitida"}), 400
     
     evdev_map = {
-        "Return": 28,
-        "Enter": 28,
-        "BackSpace": 14,
-        "space": 57,
-        "Escape": 1,
-        "Tab": 15,
-        "Up": 103,
-        "Down": 108,
-        "Left": 105,
-        "Right": 106,
-        "Page_Up": 104,
-        "Page_Down": 109,
-        "Home": 102,
-        "End": 107
+        "Return": 28, "Enter": 28, "BackSpace": 14, "space": 57, "Escape": 1, "Tab": 15,
+        "Up": 103, "Down": 108, "Left": 105, "Right": 106,
+        "Page_Up": 104, "Page_Down": 109, "Home": 102, "End": 107
     }
     
+    log_audit("info", f"Tecla enviada: {tecla}")
     sucesso = False
     if tecla in evdev_map:
         kc = evdev_map[tecla]
@@ -2643,7 +2938,7 @@ def rota_tecla():
             
     if not sucesso:
         try:
-            subprocess.run(["xdotool", "key", tecla], env=ENV, timeout=2)
+            subprocess.run(["xdotool", "key", tecla], env=ENV, timeout=2, capture_output=True)
         except Exception:
             pass
 
@@ -2665,6 +2960,7 @@ def timer_set():
     if not (1 <= minutes <= 720):
         return jsonify({"status": "error", "message": "Minutos devem estar entre 1 e 720 (12 horas)"}), 400
 
+    log_audit("info", f"Temporizador ativado para {minutes} minutos")
     with timer_lock:
         target = time.time() + (minutes * 60)
         timer_target = target
@@ -2675,6 +2971,7 @@ def timer_set():
 @app.route('/timer/cancel', methods=['POST'])
 def timer_cancel():
     global timer_target
+    log_audit("info", "Temporizador cancelado")
     with timer_lock:
         timer_target = None
     return jsonify({"status": "ok", "active": False})
@@ -2698,7 +2995,15 @@ def vol_up(): return executar_comando('vol-up')
 def vol_down(): return executar_comando('vol-down')
 
 @app.route('/poweroff', methods=['POST'])
-def poweroff(): return executar_comando('poweroff')
+def poweroff():
+    log_audit("warning", "Desligamento do sistema solicitado via /poweroff")
+    try:
+        res = subprocess.run(["systemctl", "poweroff"], env=ENV, timeout=5, capture_output=True)
+        if res.returncode != 0:
+            subprocess.run(["systemctl", "--user", "poweroff"], env=ENV, timeout=5, capture_output=True)
+    except Exception as e:
+        log_audit("error", f"Falha no comando de poweroff: {e}")
+    return jsonify({"status": "ok", "message": "Desligando o PC..."})
 
 def obter_ip_local():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -2708,17 +3013,18 @@ def obter_ip_local():
     except Exception:
         ip = '127.0.0.1'
         try:
-            # Fallback 1: tentar pegar via rota ativa ou hostname
-            out = subprocess.check_output("ip route get 1.1.1.1 2>/dev/null || ip -4 route show default 2>/dev/null", shell=True).decode()
-            match = re.search(r'src\s+([0-9\.]+)', out)
-            if match and not match.group(1).startswith("127."):
-                ip = match.group(1)
-            else:
-                ips = subprocess.check_output("hostname -I 2>/dev/null", shell=True).decode().split()
-                for candidato in ips:
-                    if not candidato.startswith("127.") and not candidato.startswith("172.17.") and ":" not in candidato:
-                        ip = candidato
-                        break
+            res = subprocess.run(["ip", "-4", "route", "show", "default"], env=ENV, capture_output=True, text=True, timeout=2)
+            if res.returncode == 0:
+                match = re.search(r'src\s+([0-9\.]+)', res.stdout)
+                if match and not match.group(1).startswith("127."):
+                    ip = match.group(1)
+            if ip == '127.0.0.1':
+                res_host = subprocess.run(["hostname", "-I"], env=ENV, capture_output=True, text=True, timeout=2)
+                if res_host.returncode == 0:
+                    for candidato in res_host.stdout.split():
+                        if not candidato.startswith("127.") and not candidato.startswith("172.17.") and ":" not in candidato:
+                            ip = candidato
+                            break
         except Exception:
             pass
     finally:
@@ -2732,7 +3038,7 @@ def exibir_qr_terminal(url):
     print("\n" + "=" * 54)
     print("  🚀 IgnoControl está pronto!")
     print(f"  🌐 Acesse no seu navegador: {url}")
-    print("  📱 Ou aponte a câmera do seu celular para o QR Code:")
+    print("  📱 Ou aponte a câmera do seu celular para o QR Code (pareamento único):")
     print("=" * 54 + "\n")
     qr.print_ascii(invert=True)
 
@@ -2761,11 +3067,28 @@ def servidor_ja_ativo(porta, token):
 
 if __name__ == '__main__':
     cfg = carregar_config()
+    validar_config(cfg)
     ip = obter_ip_local()
     porta = cfg["porta"]
     token = cfg["token"]
-    url = f"http://{ip}:{porta}/?token={token}"
-    local_url = f"http://localhost:{porta}/?token={token}"
+
+    # Suporte a TLS / HTTPS
+    ssl_cert = cfg.get("ssl_cert") or os.environ.get("SSL_CERT")
+    ssl_key = cfg.get("ssl_key") or os.environ.get("SSL_KEY")
+    ssl_context = None
+    protocol = "http"
+    if ssl_cert and ssl_key and os.path.exists(ssl_cert) and os.path.exists(ssl_key):
+        ssl_context = (ssl_cert, ssl_key)
+        protocol = "https"
+        app.config['SESSION_COOKIE_SECURE'] = True
+    else:
+        print("\n[SEGURANÇA] Servidor executando em HTTP.", file=sys.stderr)
+        print("  Recomendado: utilize em rede Wi-Fi confiável ou configure TLS/proxy reverso.\n", file=sys.stderr)
+
+    # URL com código efêmero de uso único para o terminal
+    pair_code = gerar_codigo_pareamento()
+    qr_url = f"{protocol}://{ip}:{porta}/?pair={pair_code}"
+    local_url = f"{protocol}://localhost:{porta}/?token={token}"
 
     abrir_navegador = "--open" in sys.argv or "--browser" in sys.argv
     sem_navegador = "--no-browser" in sys.argv
@@ -2775,14 +3098,16 @@ if __name__ == '__main__':
         print(f"✓ IgnoControl já está em execução na porta {porta}.")
         if (abrir_navegador or not sys.stdin.isatty()) and not sem_navegador:
             webbrowser.open(local_url)
-            enviar_notificacao_desktop(url)
+            enviar_notificacao_desktop(qr_url)
         sys.exit(0)
 
-    exibir_qr_terminal(url)
-    threading.Thread(target=enviar_notificacao_desktop, args=(url,), daemon=True).start()
+    exibir_qr_terminal(qr_url)
+    threading.Thread(target=enviar_notificacao_desktop, args=(qr_url,), daemon=True).start()
 
     # Se iniciado pelo clique no desktop (sem tty) ou com flag --open, abre o navegador local
     if (abrir_navegador or not sys.stdin.isatty()) and not sem_navegador:
         threading.Timer(0.8, lambda: webbrowser.open(local_url)).start()
 
-    app.run(host='0.0.0.0', port=porta)
+    # Bind configurável (padrão 0.0.0.0 ou IP da LAN configurado)
+    bind_host = cfg.get("bind_host", "0.0.0.0")
+    app.run(host=bind_host, port=porta, ssl_context=ssl_context)
