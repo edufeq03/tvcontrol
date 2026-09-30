@@ -214,7 +214,8 @@ After=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=${YDOTOOLD_BIN} --socket-path=/tmp/.ydotool_socket --socket-perm=0666
+ExecStart=${YDOTOOLD_BIN} --socket-path=/tmp/.ydotool_socket --socket-perm=0660
+Group=input
 Restart=always
 RestartSec=2
 
@@ -233,7 +234,23 @@ fi
 # ------------------------------------------------------------------------------
 # 4. Geração Dinâmica do Serviço Systemd e Atalhos Desktop (.desktop)
 # ------------------------------------------------------------------------------
-info "[4/5] Configurando serviço em segundo plano e atalhos desktop..."
+info "[4/5] Configurando serviço em segundo plano e arquivos de configuração..."
+
+# 4.0 Gerar Configuração e Token Seguro (fora do repositório)
+USER_CONFIG_DIR="$HOME/.config/ignocontrol"
+USER_CONFIG_FILE="$USER_CONFIG_DIR/config.json"
+mkdir -p "$USER_CONFIG_DIR"
+if [ ! -f "$USER_CONFIG_FILE" ]; then
+    info "Gerando configuração e token seguro aleatório em $USER_CONFIG_FILE..."
+    GEN_TOKEN=$("$VENV_DIR/bin/python" -c "import secrets; print(secrets.token_urlsafe(32))")
+    if [ -f "$SCRIPT_DIR/config.example.json" ]; then
+        sed "s/COLOQUE_UM_TOKEN_SEGURO_AQUI/$GEN_TOKEN/" "$SCRIPT_DIR/config.example.json" > "$USER_CONFIG_FILE"
+    else
+        echo "{\"token\": \"$GEN_TOKEN\", \"porta\": 7000, \"titulo\": \"IgnoControl\", \"botoes\": []}" > "$USER_CONFIG_FILE"
+    fi
+    chmod 600 "$USER_CONFIG_FILE"
+    success "Token de segurança gerado e salvo em $USER_CONFIG_FILE (permissão 600)!"
+fi
 
 # 4.1 Criar Serviço do Usuário no Systemd (~/.config/systemd/user/ignocontrol.service)
 mkdir -p "$HOME/.config/systemd/user"
@@ -314,18 +331,19 @@ info "[5/5] Verificando regras de firewall da rede local..."
 
 if command -v ufw >/dev/null 2>&1; then
     if sudo -n ufw status 2>/dev/null | grep -q "Status: active"; then
-        if ! sudo -n ufw status 2>/dev/null | grep -q "7000"; then
-            info "Firewall UFW ativo detectado. Liberando porta 7000/tcp..."
-            sudo ufw allow 7000/tcp comment 'IgnoControl' 2>/dev/null || true
-            success "Porta 7000/tcp liberada no firewall UFW!"
-        fi
+        info "Firewall UFW ativo detectado. Configurando acesso exclusivo para rede local..."
+        sudo ufw delete allow 7000/tcp 2>/dev/null || true
+        for subnet in "192.168.0.0/16" "10.0.0.0/8" "172.16.0.0/12"; do
+            sudo ufw allow from "$subnet" to any port 7000 proto tcp comment 'IgnoControl LAN' 2>/dev/null || true
+        done
+        success "Porta 7000/tcp liberada com segurança apenas para redes locais (UFW)!"
     fi
 elif command -v firewall-cmd >/dev/null 2>&1; then
     if sudo -n firewall-cmd --state 2>/dev/null | grep -q "running"; then
-        info "Firewalld ativo detectado. Liberando porta 7000/tcp..."
-        sudo firewall-cmd --add-port=7000/tcp --permanent >/dev/null 2>&1 || true
+        info "Firewalld ativo detectado. Liberando porta 7000/tcp para zona interna..."
+        sudo firewall-cmd --zone=internal --add-port=7000/tcp --permanent >/dev/null 2>&1 || true
         sudo firewall-cmd --reload >/dev/null 2>&1 || true
-        success "Porta 7000/tcp liberada no firewalld!"
+        success "Porta 7000/tcp liberada no firewalld (zona interna)!"
     fi
 fi
 

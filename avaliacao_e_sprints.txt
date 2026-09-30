@@ -1,0 +1,508 @@
+================================================================================
+IGNOCONTROL (tvcontrol) - AVALIAÇÃO TÉCNICA E PLANO DE SPRINTS
+================================================================================
+Escopo : boas práticas de programação, segurança e layout mobile
+Base   : tvcontrol-main.zip (remote.py ~2.250 linhas, install.sh, config.json)
+Data   : 30/09/2026
+
+Como ler as referências: "remote.py:1872" = arquivo:linha. Os itens marcados
+[VERIFICADO] foram reproduzidos rodando o código (Flask test client).
+
+
+--------------------------------------------------------------------------------
+1. RESUMO EXECUTIVO
+--------------------------------------------------------------------------------
+
+O projeto cumpre bem a proposta: é simples de instalar, tem visual coerente e o
+touchpad/atalhos funcionam. Porém, o app dá ao portador do token CONTROLE TOTAL
+do PC (mouse, teclado, digitação de texto, desligar). Isso eleva muito o nível
+de exigência de segurança, e hoje ele não é atendido.
+
+  Segurança ........ CRÍTICA  - o token é entregue sem autenticação (ver 2.1)
+  Layout mobile .... RUIM     - causas concretas identificadas (ver seção 3)
+  Boas práticas .... REGULAR  - tudo em 1 arquivo, HTML/CSS/JS dentro de string
+                                Python, sem testes, sem logging, sem CI
+
+Ordem recomendada: Sprint 0 (segurança urgente) -> Sprint 1 (layout mobile, que é
+a dor percebida) -> Sprint 2 (segurança estrutural) -> Sprint 3 (arquitetura)
+-> Sprint 4 (desempenho do touchpad) -> Sprint 5 (funcionalidades e polimento).
+
+
+--------------------------------------------------------------------------------
+2. PRINCIPAIS ACHADOS DE SEGURANÇA
+--------------------------------------------------------------------------------
+
+2.1 [CRÍTICO] [VERIFICADO] Autenticação contornável: o token é público
+    - check_auth (remote.py:1872-1879) libera as rotas index, rota_qrcode,
+      manifest, app_icon e favicon SEM token.
+    - GET / devolve o HTML com o token dentro do JavaScript (remote.py:1490,
+      "'{{ config.token }}'") e na connection_url.
+    - GET /manifest.json devolve start_url com ?token=... (remote.py:1912).
+    - GET /qrcode devolve um QR que codifica a URL com o token (remote.py:1889).
+    Resultado: qualquer dispositivo na mesma rede (visita, IoT comprometido,
+    Wi-Fi de hotel/faculdade) abre http://IP:7000/ e já recebe o token. Testado:
+    "GET / sem token -> 200, token presente no HTML".
+    O token existe, mas na prática não protege nada.
+
+2.2 [CRÍTICO] Token padrão conhecido e versionado
+    - "minhachave123" está no config.json (commitado), no fallback do código
+      (remote.py:37 e :51) e no README.
+    - config.json não está no .gitignore; quem fizer fork/commit expõe o token.
+    - Não há geração de token aleatório na instalação.
+
+2.3 [ALTO] Execução de comandos com shell=True
+    - remote.py:1946 executa o campo "comando" do config.json via shell.
+      Hoje só o dono edita o arquivo, mas qualquer futura tela de edição (o
+      README cita "editar pela interface web", que ainda não existe) ou
+      escrita indevida em config.json vira execução remota de código.
+    - remote.py:1938 monta comando adb com shell=True e IP fixo.
+    - remote.py:2170/2175 usam shell=True sem necessidade.
+    - Comandos encadeados em config ("a 2>/dev/null || b") só funcionam por
+      causa do shell; isso precisa virar lógica explícita.
+
+2.4 [ALTO] Token na query string, em HTTP puro
+    - O token vai em ?token=... em TODAS as chamadas (inclusive mover mouse).
+      Fica em histórico do navegador, logs do Flask, Referer e cache.
+    - Sem HTTPS, qualquer um no Wi-Fi captura o token (sniffing).
+    - Comparação com "!=" (remote.py:1878) não é tempo-constante.
+    - Sem limite de tentativas: dá para força-bruta no token.
+
+2.5 [ALTO] Endpoints de ação aceitam GET e não têm proteção CSRF/Origin
+    - /exec, /play, /vol-up, /vol-down, /poweroff aceitam GET
+      (remote.py:1930, 2152-2159). Uma simples tag <img> ou link dispara
+      desligamento se o token vazar (e ele vaza, ver 2.1).
+    - Sem verificação de Origin/Host: risco de DNS rebinding contra IP local.
+
+2.6 [MÉDIO] Validação de entrada insuficiente
+    - /timer/set (remote.py:2122): minutes sem limites. minutes=0 ou negativo
+      desliga o PC na hora; valor enorme cria timer absurdo.
+    - /key (remote.py:2085): repassa qualquer string ao xdotool. Permite
+      combinações como ctrl+alt+F2, super+..., sem lista de permitidas.
+    - /type, /mouse/move, /mouse/scroll: sem limite de tamanho/taxa.
+    - /volume: int(novo_vol) sem tratamento de erro (500 se vier texto).
+    - Erros devolvem str(e) ao cliente (vazamento de detalhes internos).
+
+2.7 [MÉDIO] Servidor de desenvolvimento em produção
+    - app.run(host='0.0.0.0') (remote.py:2245) usa o servidor do Werkzeug,
+      que não é indicado para rodar continuamente. Escuta em todas as
+      interfaces, inclusive Docker/VPN.
+
+2.8 [MÉDIO] Instalador amplia a superfície de ataque (install.sh)
+    - ydotoold com --socket-perm=0666 em /tmp/.ydotool_socket (install.sh:217):
+      QUALQUER usuário/processo local consegue injetar teclado e mouse.
+    - ufw/firewalld: libera 7000/tcp para qualquer origem (install.sh:319,326),
+      não só para a rede local.
+    - O serviço systemd de usuário não tem nenhum hardening.
+
+2.9 [BAIXO] Higiene do repositório
+    - ignocontrol.desktop commitado com caminhos pessoais
+      (/home/capella/dev/antigravity/tvcontrol/...).
+    - IP da TV (192.168.15.5) fixo em remote.py:1400, :1938 e config.json.
+    - Os comandos tv-* do config.json são ignorados: o dicionário tv_keys
+      (remote.py:1932) intercepta antes (duplicidade/dead config).
+    - Link do Google Fonts (remote.py:110): o app depende de internet e
+      informa o acesso a terceiros; funciona mal em rede local sem saída.
+    - Sem cabeçalhos de segurança (CSP, X-Frame-Options, nosniff).
+
+
+--------------------------------------------------------------------------------
+3. PRINCIPAIS ACHADOS DE LAYOUT (MOBILE)
+--------------------------------------------------------------------------------
+
+Causas prováveis do "ficou muito ruim no celular", em ordem de impacto:
+
+3.1 Campo de texto com fonte menor que 16px (remote.py:1169-1176, 0.82rem)
+    No iPhone o Safari dá zoom automático ao focar input com fonte < 16px, e a
+    página não volta ao normal. Como o viewport tem user-scalable=no, o usuário
+    fica preso num layout ampliado e cortado. É o erro mobile mais clássico e
+    afeta exatamente a aba Touchpad, onde fica o teclado.
+
+3.2 Áreas fixas consomem quase metade da tela
+    Header + barra de abas sticky + widget de volume sticky ficam sempre
+    visíveis (remote.py:283 e :1081, top: 54px fixo). Em celular pequeno sobra
+    pouco espaço para a grade. O "top: 54px" do volume assume altura fixa da
+    barra de abas, mas ela muda de altura abaixo de 380px (remote.py:325), então
+    os dois elementos podem se sobrepor.
+
+3.3 Altura do touchpad calculada "no chute"
+    - height: calc(100dvh - 110px) (remote.py:593) presume que header + abas
+      somam 110px. Não somam em todos os aparelhos (notch, barra do navegador,
+      fonte grande do sistema).
+    - A aba Touchpad trava o scroll da página (body.touchpad-active,
+      remote.py:147-152) e dentro dela há superfície + botões de clique + campo
+      de texto + 4 teclas. Em tela baixa ou com teclado virtual aberto, o
+      conteúdo é cortado e NÃO há como rolar para alcançá-lo.
+
+3.4 Alvos de toque pequenos (recomendado: mínimo 44x44px)
+    - .quick-key: ~28px de altura, fonte 0.72rem (remote.py:1207)
+    - .keyboard-send-btn: ~32px
+    - .qr-btn: ~26px (remote.py:236 e 899) | .modal-close-btn: 28px (:927)
+    - .btn-cancel-timer: ~28px | .tab-btn: ~38px
+    - Textos de 0.62rem a 0.72rem (scroll-strip, badges) ficam ilegíveis.
+
+3.5 Abas com CSS que não casa com o HTML
+    O CSS trata ".tab-btn svg" e ".tab-btn span:last-child" (remote.py:306-316),
+    mas o HTML usa <span>emoji</span> + texto solto (remote.py:1250-1260). O
+    "ellipsis" acaba aplicado ao emoji e o rótulo ("Controles") pode quebrar
+    linha ou estourar em telas estreitas. As regras de svg são código morto.
+
+3.6 Zoom bloqueado (remote.py:98: maximum-scale=1, user-scalable=no)
+    Viola acessibilidade (WCAG 1.4.4). Com 3.1 corrigido, não há motivo para
+    manter o bloqueio.
+
+3.7 user-select: none em TODOS os elementos (remote.py:117)
+    Impede selecionar/copiar o link no modal "Conectar" - mas o próprio app
+    sugere "selecione e copie o endereço" no fallback (remote.py:1518).
+    Aplicar só nos botões e no touchpad.
+
+3.8 Aba TV praticamente inutilizável
+    O backend suporta up/down/left/right/ok/back/home/power (remote.py:1932),
+    mas a tela só tem 4 botões (vol-, vol+, play, home). Não existe D-pad, que
+    é o controle essencial de uma TV. IP exibido fixo (remote.py:1400).
+
+3.9 Outros pontos de layout/UX
+    - Emojis como ícones: render diferente por aparelho; preferir SVG (já
+      existem ícones SVG no código).
+    - Sem feedback visual de falha real: a UI mostra "✓" ao disparar, mas
+      /exec responde "ok" mesmo se o comando falhar (não olha returncode).
+    - Sem indicador de conexão/reconexão: o "Online" é sempre verde
+      (remote.py:1236, estático).
+    - Sem modo paisagem tratado; sem suporte a prefers-reduced-motion.
+    - Touchpad: gesto de 2 dedos só é detectado no touchstart
+      (remote.py:1719); se o 2º dedo encosta depois, vira movimento de 1 dedo.
+      Não há tratamento de touchcancel. Toque curto dispara clique mesmo ao
+      terminar um gesto de scroll em alguns casos.
+    - Tela cheia e vibração dependem de APIs que o iOS não suporta
+      (navigator.vibrate não existe no Safari iOS); prever fallback.
+
+
+--------------------------------------------------------------------------------
+4. PRINCIPAIS ACHADOS DE BOAS PRÁTICAS
+--------------------------------------------------------------------------------
+
+4.1 Monólito: remote.py mistura backend, ~1.150 linhas de CSS, HTML e ~350 de
+    JS dentro de HTML_TEMPLATE (remote.py:94-1865). Sem syntax highlight, sem
+    lint, sem cache do navegador, diff ruim no Git.
+4.2 render_template_string com valores interpolados em atributos onclick:
+    onclick="abrirConfirmacao('{{ botao.id }}', '{{ botao.label }}' ...)"
+    Um rótulo com apóstrofo ("Don't") quebra o JS. Usar data-attributes +
+    addEventListener. O mesmo vale para o token dentro de aspas no <script>.
+4.3 carregar_config() lê e faz parse do JSON do disco a cada requisição
+    (inclusive a cada movimento do mouse, via check_auth) e engole erros com
+    "except Exception: pass" (remote.py:35-53). Config quebrada passa
+    despercebida.
+4.4 Cada evento de mouse gera 1 requisição HTTP + 1 processo (ydotool e, se
+    falhar, xdotool). A cada chamada tenta ydotool primeiro mesmo em X11
+    (duplo spawn). O backend (ydotool/xdotool) deveria ser detectado uma vez.
+4.5 Retornos de subprocess.run ignorados: não há returncode, stderr nem
+    timeout na maioria das chamadas (ex.: /exec sem timeout). Um comando
+    travado prende a thread do servidor.
+4.6 Sem logging estruturado (nada de quem executou o quê e quando), sem
+    testes automatizados, sem CI, sem lint/formatter, sem tipagem.
+4.7 Nomenclatura mista PT/EN e legado ("termcontrol", rotas legadas
+    /play, /vol-up, setup_autostart.sh "legado"). Remover o que não é usado.
+4.8 README promete "editar botões pela interface web", mas não há rota nem
+    tela para isso; requirements.txt sem versões fixas (Flask>=2.0.0).
+4.9 Estado do timer só em memória e perdido ao reiniciar o serviço; o
+    timer_worker faz polling de 1s em thread própria (poderia usar
+    threading.Timer ou agendamento do systemd). Fallback "sudo poweroff"
+    pode travar esperando senha.
+4.10 CSS duplicado (.qr-btn definido duas vezes), valores mágicos repetidos,
+    sem variáveis CSS (custom properties) para cores/espaçamentos.
+
+
+--------------------------------------------------------------------------------
+5. PLANO EM SPRINTS
+--------------------------------------------------------------------------------
+Estimativas pensadas para 1 desenvolvedor. Cada item traz o critério de aceite
+(CA) para validar a entrega.
+
+
+SPRINT 0 - EMERGÊNCIA DE SEGURANÇA (1 a 2 dias)
+Meta: fechar as falhas que tornam o app aberto para a rede.
+
+  0.1 Proteger /, /qrcode e /manifest.json
+      - Exigir autenticação em todas as rotas, exceto uma página de login e os
+        arquivos estáticos que não contêm segredo.
+      - Nunca renderizar o token no HTML nem no manifest (start_url: "/").
+      - O QR Code de pareamento deve ser exibido só no terminal do PC e numa
+        tela acessível apenas de localhost (127.0.0.1) ou após login.
+      CA: curl http://IP:7000/ sem credencial retorna 401/redirect; o token não
+      aparece em nenhuma resposta não autenticada.
+
+  0.2 Eliminar o token padrão
+      - Gerar token aleatório (secrets.token_urlsafe(32)) no install.sh e no
+        primeiro start; gravar em arquivo fora do repositório
+        (~/.config/ignocontrol/config.json, permissão 600).
+      - Recusar iniciar se o token for "minhachave123" ou vazio.
+      - Adicionar config.json ao .gitignore e versionar só config.example.json.
+      - Trocar o token atual (considerar comprometido).
+      CA: repositório sem segredos; app não sobe com token fraco.
+
+  0.3 Restringir GET em rotas de ação
+      - /exec, /play, /vol-up, /vol-down, /poweroff somente POST; remover rotas
+        legadas.
+      CA: GET nessas rotas retorna 405.
+
+  0.4 Validar /timer/set e /key
+      - minutes inteiro entre 1 e 720; 400 fora disso.
+      - /key com lista de teclas permitidas (Return, BackSpace, space, Escape,
+        Tab, setas, etc.).
+      CA: minutes=0 e key="ctrl+alt+F2" retornam 400.
+
+  0.5 Mitigação imediata de rede
+      - Documentar e aplicar no firewall: liberar 7000/tcp apenas para a sub-rede
+        local (ex.: ufw allow from 192.168.0.0/16 to any port 7000).
+      - Corrigir socket do ydotool: --socket-perm=0660 + grupo dedicado, ou
+        socket em /run/user/UID (install.sh:217).
+      CA: porta inacessível de fora da LAN; socket sem 0666.
+
+
+SPRINT 1 - LAYOUT MOBILE (3 a 5 dias)
+Meta: usar o app confortavelmente em celulares de 360px a 430px, iOS e Android.
+
+  1.1 Corrigir zoom e viewport
+      - Inputs com font-size >= 16px.
+      - Remover maximum-scale=1 e user-scalable=no.
+      CA: no iPhone, focar o campo de texto não ampliar a página.
+
+  1.2 Reestruturar o frame da tela (app-shell)
+      - Layout em 3 regiões: topo (header compacto), conteúdo (rolável) e
+        barra de abas INFERIOR fixa (padrão de app mobile, alcançável com o
+        polegar), usando position: fixed + env(safe-area-inset-bottom).
+      - Volume deixa de ser sticky sobreposto: vira barra compacta de 1 linha
+        ou passa para dentro da aba Controles, sem top: 54px fixo.
+      - Usar altura via flex (min-height: 0) e dvh, sem subtrações manuais
+        como "100dvh - 110px".
+      CA: nenhuma sobreposição entre abas e volume de 320px a 1024px de largura;
+      conteúdo nunca escondido atrás da barra.
+
+  1.3 Reprojetar a aba Touchpad
+      - Superfície ocupa o espaço disponível; teclado de texto vira painel
+        recolhível ("Teclado"), que abre sem empurrar/cortar a superfície.
+      - Permitir rolagem interna do painel quando o teclado virtual abrir
+        (visualViewport API).
+      - Tratar 2 dedos durante o touchmove (e.touches.length), touchcancel e
+        sensibilidade ajustável (hoje fixo em 1.5).
+      CA: com teclado virtual aberto todos os controles continuam alcançáveis.
+
+  1.4 Alvos de toque e tipografia
+      - Mínimo 44x44px em todos os botões; fontes >= 0.8rem (12,8px) para
+        texto auxiliar e >= 1rem para rótulos.
+      - Espaçamento mínimo de 8px entre alvos.
+      CA: auditoria no Chrome DevTools/Lighthouse sem "tap targets too small".
+
+  1.5 Barra de abas
+      - Marcação correta: <button><svg/><span class="label">Texto</span></button>
+        e CSS alinhado; ícones SVG no lugar de emojis.
+      - Ícone acima do texto em telas < 400px.
+      CA: rótulos nunca quebram linha nem ficam cortados em 320px.
+
+  1.6 Aba TV com D-pad real
+      - Cruz direcional (cima/baixo/esquerda/direita + OK), Voltar, Home,
+        Volume, Mute, Power; o backend já suporta as teclas.
+      - IP da TV vindo da configuração, não do HTML.
+      CA: dá para navegar no menu da Android TV só com o celular.
+
+  1.7 Acessibilidade e seleção de texto
+      - user-select: none só em botões/touchpad; liberar no campo do link.
+      - aria-label nos botões só com ícone, foco visível, contraste >= 4.5:1,
+        prefers-reduced-motion.
+      CA: Lighthouse Accessibility >= 90.
+
+  1.8 Teste real
+      - Validar em: iPhone (Safari), Android (Chrome), em retrato e paisagem,
+        como PWA instalado e no navegador.
+      CA: checklist de dispositivos preenchido e anexado ao PR.
+
+
+SPRINT 2 - SEGURANÇA ESTRUTURAL (3 a 5 dias)
+Meta: defesa em profundidade, sem depender de "rede confiável".
+
+  2.1 Autenticação de verdade
+      - Login com token/PIN uma vez; servidor emite cookie de sessão
+        (HttpOnly, SameSite=Strict, Secure quando houver HTTPS); o token NUNCA
+        mais trafega em query string.
+      - Pareamento: QR com código de uso único e curta validade, trocado por
+        sessão; possibilidade de listar e revogar dispositivos.
+      - hmac.compare_digest na comparação.
+      CA: token ausente de URLs e logs; QR expira após uso/tempo.
+
+  2.2 Proteção contra força bruta
+      - Rate limit por IP (Flask-Limiter ou equivalente) e bloqueio temporário
+        após N falhas; limite de taxa também em /mouse/move e /type.
+      CA: 10 tentativas inválidas seguidas bloqueiam o IP por alguns minutos.
+
+  2.3 Transporte seguro
+      - Opção de HTTPS com certificado autoassinado/mkcert (ou proxy Caddy) e
+        documentação do processo de confiança do certificado no celular.
+      CA: acesso via https:// funcionando; aviso claro quando rodar em HTTP.
+
+  2.4 Execução de comandos sem shell
+      - Substituir "comando" (string) por lista de argumentos
+        (["playerctl","play-pause"]) com shlex.split e shell=False; fallbacks
+        ("||") modelados como lista de comandos tentados em ordem.
+      - Ações do sistema e de TV (adb) em funções Python dedicadas, com IP
+        validado (ipaddress.ip_address) e teclas em lista fixa.
+      - Validar o config.json no carregamento (jsonschema/pydantic) e recusar
+        iniciar com configuração inválida.
+      - Timeout e captura de returncode em todo subprocess.
+      CA: nenhum shell=True no código; bandit sem achados altos.
+
+  2.5 Verificação de Origin/Host e cabeçalhos
+      - Validar Host e Origin (mitiga DNS rebinding/CSRF); CSP restritiva
+        (sem inline perigoso após mover JS para arquivos), X-Frame-Options:
+        DENY, X-Content-Type-Options: nosniff, Referrer-Policy: no-referrer.
+      CA: securityheaders.com/Mozilla Observatory nota B ou melhor.
+
+  2.6 Serviço e rede
+      - Bind configurável (padrão: só a interface da LAN, não 0.0.0.0).
+      - Hardening do systemd de usuário: NoNewPrivileges=yes,
+        ProtectSystem=strict, PrivateTmp=yes, RestrictAddressFamilies.
+      - Ações destrutivas (poweroff/suspender) via polkit/systemd-logind, sem
+        "sudo poweroff"; firewall restrito à sub-rede.
+      CA: systemd-analyze security com pontuação < 5.
+
+  2.7 Auditoria e logs
+      - Registrar (arquivo rotativo) IP, ação, resultado e horário; logar
+        tentativas de login falhas; não logar o texto digitado em /type.
+      CA: é possível reconstruir "quem desligou o PC e quando".
+
+
+SPRINT 3 - ARQUITETURA E QUALIDADE DE CÓDIGO (4 a 6 dias)
+Meta: base sustentável e testável.
+
+  3.1 Separar responsabilidades
+      tvcontrol/
+        app.py            (factory create_app, blueprints)
+        config.py         (carregar/validar/cachear config)
+        auth.py           (sessão, rate limit)
+        services/         (input.py, audio.py, media.py, power.py, tv.py)
+        routes/           (mouse.py, keyboard.py, system.py, tv.py, timer.py)
+        templates/        (index.html, login.html)
+        static/           (css/app.css, js/app.js, icons.svg, manifest.json)
+      CA: remote.py < 150 linhas; HTML/CSS/JS em arquivos próprios.
+
+  3.2 Templates e JS seguros
+      - Jinja com templates em arquivo e autoescape; dados dos botões em
+        data-attributes; sem interpolar valores dentro de JS.
+      - CSS com variáveis (:root) e sem duplicações (.qr-btn etc.).
+      CA: rótulo com apóstrofo não quebra a tela.
+
+  3.3 Config e estado
+      - Carregar config uma vez (recarga por sinal/endpoint protegido), erros
+        de JSON reportados com mensagem clara (não silenciar).
+      - requirements.txt com versões fixas (pip-compile) e
+        requirements-dev.txt.
+      CA: config inválida impede o start e explica o motivo.
+
+  3.4 Tratamento de erros e respostas
+      - Padronizar JSON {status, error_code}; não devolver str(e) ao cliente;
+        /exec refletir falha real (returncode != 0) e a UI exibir o erro.
+      CA: botão cujo comando falha mostra erro na tela, não "✓".
+
+  3.5 Testes e automação
+      - pytest com test client (auth, validação, rotas, schema do config) e
+        mocks de subprocess; cobertura mínima de 70% no backend.
+      - CI (GitHub Actions): ruff + black, bandit, pytest, shellcheck no
+        install.sh.
+      - pre-commit com os mesmos checks.
+      CA: pipeline verde obrigatório para merge.
+
+  3.6 Limpeza do repositório
+      - Remover rotas legadas, termcontrol, setup_autostart.sh legado e
+        ignocontrol.desktop com caminho pessoal (gerar no instalador).
+      - Alinhar README (itens prometidos x existentes) e traduzir de forma
+        consistente PT/EN; nomes de funções/variáveis em um só idioma.
+      CA: nada no repo referencia /home/capella ou 192.168.15.5.
+
+
+SPRINT 4 - DESEMPENHO E CONFIABILIDADE DO CONTROLE (3 a 4 dias)
+Meta: touchpad fluido e servidor estável.
+
+  4.1 Canal em tempo real para mouse/rolagem
+      - WebSocket (flask-sock/Flask-SocketIO) autenticado, enviando deltas
+        agrupados a ~60 Hz, em vez de 1 POST por movimento.
+      - Fallback para HTTP se o WebSocket falhar.
+      CA: latência percebida < 50 ms na LAN; sem fila de requisições.
+
+  4.2 Backend de entrada sem spawn por evento
+      - Detectar UMA vez ydotool vs xdotool (sessão Wayland/X11) e guardar.
+      - Avaliar python-evdev/uinput ou ydotool em modo socket para evitar criar
+        processo a cada movimento.
+      CA: uso de CPU do servidor < 5% durante movimento contínuo.
+
+  4.3 Servidor adequado
+      - Rodar com waitress/gunicorn (threads) em vez do servidor de
+        desenvolvimento; ajustar instalador e unit do systemd.
+      CA: sem aviso "development server" nos logs.
+
+  4.4 Timer robusto
+      - Persistir o alvo do timer em disco (sobrevive a reinício do serviço);
+        usar threading.Timer ou systemd-run --on-active; cancelar de forma
+        limpa; remover fallback "sudo poweroff".
+      CA: timer ativo continua após restart do serviço.
+
+  4.5 Resiliência do cliente
+      - Indicador de conexão real (ping periódico) no lugar do "Online"
+        estático; reconexão automática; toast de erro quando cair.
+      - Service worker para cachear o shell do PWA e funcionar offline até a
+        tela de login/erro.
+      CA: desligar o servidor muda o indicador para "Offline" em < 5 s.
+
+  4.6 Independência de internet
+      - Fonte self-hosted (ou fonte do sistema) em vez do Google Fonts.
+      CA: tela idêntica sem acesso à internet.
+
+
+SPRINT 5 - FUNCIONALIDADES E POLIMENTO (contínuo)
+Meta: fechar lacunas de produto e facilitar a manutenção.
+
+  5.1 Editor de botões na interface (só com Sprint 2 concluído)
+      - Criar/editar/reordenar botões pela web com validação de schema e
+        confirmação; sem aceitar comando arbitrário em texto livre (usar
+        catálogo de ações ou lista de argumentos validada).
+  5.2 Múltiplos dispositivos de TV (nome, IP, pareamento ADB guiado).
+  5.3 Teclado remoto mais completo (atalhos, F-keys permitidas, colar texto
+      do celular).
+  5.4 Temas claro/escuro (prefers-color-scheme) e i18n (pt-BR/en) em arquivo
+      único de textos.
+  5.5 Empacotamento: pipx/pip install ou .deb, com "ignocontrol doctor" que
+      diagnostica dependências, sessão Wayland/X11, firewall e permissões.
+  5.6 Documentação: SECURITY.md (modelo de ameaça, como reportar), guia de
+      HTTPS no celular, CHANGELOG e versionamento semântico.
+
+
+--------------------------------------------------------------------------------
+6. RESUMO DE PRIORIDADES
+--------------------------------------------------------------------------------
+
+  FAZER AGORA (antes de qualquer outra coisa):
+    - Fechar a rota / que entrega o token (0.1) e trocar o token (0.2).
+    - Limitar a porta 7000 à rede local (0.5).
+
+  MAIOR GANHO VISUAL NO CELULAR (Sprint 1):
+    - Input >= 16px (1.1), barra de abas inferior + fim do sticky duplo (1.2),
+      touchpad com altura flexível e teclado recolhível (1.3), alvos de 44px
+      (1.4) e D-pad na aba TV (1.6).
+
+  MAIOR GANHO DE MANUTENÇÃO (Sprint 3):
+    - Separar HTML/CSS/JS do Python e adicionar testes + CI.
+
+Pontos fortes a preservar: instalador universal com detecção de gerenciador de
+pacotes, suporte a Wayland e X11, fallback entre ydotool e xdotool, confirmação
+para ações destrutivas, boas ideias de PWA (manifest, safe-area, dvh) e
+identidade visual consistente.
+
+
+--------------------------------------------------------------------------------
+7. LIMITES DESTA AVALIAÇÃO
+--------------------------------------------------------------------------------
+- Análise estática do código + teste automatizado do item 2.1. Não foi possível
+  abrir o app em um celular real; os itens de layout (seção 3) vêm da leitura
+  do CSS/HTML e de problemas conhecidos de navegadores móveis. Confirme-os no
+  aparelho (Sprint 1.8) antes de priorizar ajustes finos.
+- Os comportamentos de ydotool/xdotool/adb/playerctl dependem do ambiente
+  Linux do usuário e não foram executados aqui.
+- As estimativas de esforço são aproximadas.
+================================================================================

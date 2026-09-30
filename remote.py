@@ -9,11 +9,26 @@ import time
 import webbrowser
 import io
 import qrcode
-from flask import Flask, render_template_string, request, jsonify, abort, send_from_directory, send_file
+from flask import Flask, render_template_string, request, jsonify, abort, send_from_directory, send_file, redirect, make_response
+import hmac
+import secrets
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+USER_CONFIG_DIR = os.path.expanduser("~/.config/ignocontrol")
+USER_CONFIG_PATH = os.path.join(USER_CONFIG_DIR, "config.json")
+LOCAL_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+CONFIG_EXAMPLE_PATH = os.path.join(os.path.dirname(__file__), "config.example.json")
+
+def obter_caminho_config():
+    if os.path.exists(USER_CONFIG_PATH):
+        return USER_CONFIG_PATH
+    if os.path.exists(LOCAL_CONFIG_PATH):
+        return LOCAL_CONFIG_PATH
+    return USER_CONFIG_PATH
+
+CONFIG_PATH = obter_caminho_config()
 BASE_DIR = os.path.dirname(__file__)
 
 ICONES_SVG = {
@@ -32,23 +47,60 @@ ICONES_SVG = {
     "default": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>'
 }
 
+def salvar_config(dados, path=None):
+    caminho = path or obter_caminho_config()
+    os.makedirs(os.path.dirname(caminho), exist_ok=True)
+    with open(caminho, "w", encoding="utf-8") as f:
+        json.dump(dados, f, indent=2, ensure_ascii=False)
+    try:
+        os.chmod(caminho, 0o600)
+    except Exception:
+        pass
+
 def carregar_config():
+    global CONFIG_PATH
+    CONFIG_PATH = obter_caminho_config()
     padrao = {
-        "token": "minhachave123",
+        "token": "",
         "porta": 7000,
         "titulo": "IgnoControl",
+        "tv_ip": "192.168.1.100",
         "botoes": []
     }
     config = dict(padrao)
+
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                 dados = json.load(f)
                 config.update(dados)
+        except Exception as e:
+            print(f"[AVISO] Erro ao carregar {CONFIG_PATH}: {e}", file=sys.stderr)
+    elif os.path.exists(CONFIG_EXAMPLE_PATH):
+        try:
+            with open(CONFIG_EXAMPLE_PATH, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+                config.update(dados)
         except Exception:
             pass
-    
-    config["token"] = os.environ.get("TVCONTROL_TOKEN", os.environ.get("TERMCONTROL_TOKEN", config.get("token", "minhachave123")))
+
+    # Se não há token configurado ou for o padrão comprometido/inseguro, gera um token forte
+    token_atual = str(config.get("token", "")).strip()
+    if not token_atual or token_atual in ("minhachave123", "COLOQUE_UM_TOKEN_SEGURO_AQUI"):
+        novo_token = secrets.token_urlsafe(32)
+        print("\n" + "=" * 60, file=sys.stderr)
+        print("  [SEGURANÇA] Token padrão inseguro ou ausente detectado!", file=sys.stderr)
+        print(f"  Gerando novo token seguro aleatório de 32 bytes...", file=sys.stderr)
+        print(f"  Arquivo protegido: {USER_CONFIG_PATH} (perm: 0600)", file=sys.stderr)
+        print("=" * 60 + "\n", file=sys.stderr)
+        config["token"] = novo_token
+        salvar_config(config, USER_CONFIG_PATH)
+        CONFIG_PATH = USER_CONFIG_PATH
+
+    env_token = os.environ.get("TVCONTROL_TOKEN") or os.environ.get("TERMCONTROL_TOKEN")
+    if env_token:
+        config["token"] = env_token.strip()
+
     config["porta"] = int(os.environ.get("PORT", config.get("porta", 7000)))
     return config
 
@@ -1473,7 +1525,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <p class="modal-desc" style="margin-bottom: 10px;">Aponte a câmera do seu celular para o QR Code (no mesmo Wi-Fi) ou use o link abaixo:</p>
             
             <div class="qr-url-box">
-                <input type="text" id="qrUrlInput" value="{{ connection_url }}" readonly>
+                <input type="text" id="qrUrlInput" value="{{ local_url }}" readonly>
                 <button class="copy-btn" id="btnCopiarLink" onclick="copiarLinkConexao()" title="Copiar Link">
                     <span id="copyIcon">📋</span>
                 </button>
@@ -1487,10 +1539,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        let token = urlParams.get('token') || localStorage.getItem('tvcontrol_token') || localStorage.getItem('termcontrol_token') || '{{ config.token }}';
+        let token = urlParams.get('token') || localStorage.getItem('tvcontrol_token') || localStorage.getItem('termcontrol_token') || '';
         if (urlParams.get('token')) {
             localStorage.setItem('tvcontrol_token', urlParams.get('token'));
             localStorage.setItem('termcontrol_token', urlParams.get('token'));
+        }
+
+        function apiFetch(url, options = {}) {
+            if (!options.headers) options.headers = {};
+            options.credentials = 'same-origin';
+            if (token) {
+                options.headers['X-Auth-Token'] = token;
+            }
+            return fetch(url, options).then(res => {
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                }
+                return res;
+            });
         }
 
         let pendingCmd = null;
@@ -1869,25 +1935,228 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
+LOGIN_TEMPLATE = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IgnoControl - Acesso Seguro</title>
+    <link rel="icon" type="image/png" href="/icon.png">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #0b0f19;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-card {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            backdrop-filter: blur(16px);
+            padding: 32px 24px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+        .logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #60a5fa, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        p {
+            font-size: 0.88rem;
+            color: #94a3b8;
+            margin-bottom: 24px;
+            line-height: 1.4;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        input[type="password"], input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(2, 6, 23, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 16px; /* Evita auto-zoom do Safari no iOS */
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+        }
+        .btn-submit:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+        }
+        .error-msg {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            margin-bottom: 18px;
+        }
+        .hint {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 20px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <img src="/icon.png" alt="IgnoControl" class="logo">
+        <h1>IgnoControl</h1>
+        <p>Informe o token de segurança para acessar o controle remoto.</p>
+
+        {% if erro %}
+        <div class="error-msg">{{ erro }}</div>
+        {% endif %}
+
+        <form action="/login" method="POST">
+            <div class="input-group">
+                <label for="token">Token de Acesso</label>
+                <input type="password" id="token" name="token" placeholder="Digite o token..." required autofocus>
+            </div>
+            <button type="submit" class="btn-submit">Desbloquear</button>
+        </form>
+
+        <div class="hint">
+            O token é exibido no terminal ao iniciar o servidor ou pode ser configurado em ~/.config/ignocontrol/config.json.
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+def validar_token(token_fornecido, token_esperado):
+    if not token_fornecido or not token_esperado:
+        return False
+    return hmac.compare_digest(str(token_fornecido).strip(), str(token_esperado).strip())
+
+def usuario_autenticado(cfg):
+    # 1. Cookie HttpOnly seguro de sessão
+    token_cookie = request.cookies.get('ignocontrol_session')
+    if token_cookie and validar_token(token_cookie, cfg["token"]):
+        return True
+
+    # 2. Header HTTP (para clientes de API e PWA)
+    token_header = request.headers.get('X-Auth-Token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if token_header and validar_token(token_header, cfg["token"]):
+        return True
+
+    # 3. Query string (compatibilidade na URL inicial)
+    token_query = request.args.get('token')
+    if token_query and validar_token(token_query, cfg["token"]):
+        return True
+
+    return False
+
 @app.before_request
 def check_auth():
-    if request.endpoint in ('index', 'static', 'favicon', 'manifest', 'app_icon', 'rota_qrcode'):
-        return
+    # Rotas públicas ou com verificação própria de autenticação/origem
+    if request.endpoint in ('index', 'rota_login', 'rota_logout', 'rota_qrcode', 'static', 'favicon', 'manifest', 'app_icon'):
+        return None
+    
     cfg = carregar_config()
-    token = request.args.get('token') or request.headers.get('X-Auth-Token')
-    if token != cfg["token"]:
+    if not usuario_autenticado(cfg):
         abort(401)
 
 @app.route('/')
 def index():
     cfg = carregar_config()
+
+    # Se recebeu token via query string (?token=...), valida, grava cookie e redireciona para URL limpa
+    token_query = request.args.get('token')
+    if token_query:
+        if validar_token(token_query, cfg["token"]):
+            resp = redirect('/')
+            resp.set_cookie('ignocontrol_session', cfg["token"], httponly=True, samesite='Lax', max_age=60*60*24*30)
+            return resp
+        else:
+            return render_template_string(LOGIN_TEMPLATE, erro="Token de acesso inválido. Verifique o terminal do PC."), 401
+
+    if not usuario_autenticado(cfg):
+        return render_template_string(LOGIN_TEMPLATE), 401
+
     ip = obter_ip_local()
-    url = f"http://{ip}:{cfg['porta']}/?token={cfg['token']}"
-    return render_template_string(HTML_TEMPLATE, config=cfg, icones=ICONES_SVG, connection_url=url)
+    local_url = f"http://{ip}:{cfg['porta']}/"
+    return render_template_string(HTML_TEMPLATE, config=cfg, icones=ICONES_SVG, local_url=local_url)
+
+@app.route('/login', methods=['GET', 'POST'])
+def rota_login():
+    cfg = carregar_config()
+    if request.method == 'POST':
+        token = request.form.get('token') or (request.get_json(silent=True) or {}).get('token')
+        if validar_token(token, cfg["token"]):
+            resp = redirect('/')
+            resp.set_cookie('ignocontrol_session', cfg["token"], httponly=True, samesite='Lax', max_age=60*60*24*30)
+            return resp
+        return render_template_string(LOGIN_TEMPLATE, erro="Token incorreto. Tente novamente."), 401
+
+    if usuario_autenticado(cfg):
+        return redirect('/')
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route('/logout', methods=['GET', 'POST'])
+def rota_logout():
+    resp = redirect('/login')
+    resp.delete_cookie('ignocontrol_session')
+    return resp
 
 @app.route('/qrcode')
 def rota_qrcode():
     cfg = carregar_config()
+    # Permitido apenas de localhost OU para usuário já autenticado
+    is_local = request.remote_addr in ('127.0.0.1', '::1', 'localhost')
+    if not (is_local or usuario_autenticado(cfg)):
+        abort(401)
+
     ip = obter_ip_local()
     url = f"http://{ip}:{cfg['porta']}/?token={cfg['token']}"
     qr = qrcode.QRCode(box_size=8, border=2)
@@ -1909,7 +2178,7 @@ def manifest():
     return jsonify({
         "name": cfg.get("titulo", "IgnoControl"),
         "short_name": cfg.get("titulo", "IgnoControl"),
-        "start_url": f"/?token={cfg['token']}",
+        "start_url": "/",
         "display": "standalone",
         "background_color": "#0b0f19",
         "theme_color": "#0b0f19",
@@ -1927,23 +2196,30 @@ def manifest():
 def favicon():
     return ('', 204)
 
-@app.route('/exec/<btn_id>', methods=['GET', 'POST'])
+@app.route('/exec/<btn_id>', methods=['POST'])
 def executar_comando(btn_id):
+    cfg = carregar_config()
     # Intercept TV D-Pad commands
     tv_keys = {
         'tv-up': '19', 'tv-down': '20', 'tv-left': '21', 'tv-right': '22', 'tv-ok': '23',
         'tv-back': '4', 'tv-home': '3', 'tv-play': '85', 'tv-vol-up': '24', 'tv-vol-down': '25', 'tv-power': '26'
     }
     if btn_id in tv_keys:
-        subprocess.run(f"adb -s 192.168.15.5 shell input keyevent {tv_keys[btn_id]}", shell=True)
+        tv_ip = cfg.get("tv_ip", "192.168.1.100")
+        try:
+            subprocess.run(["adb", "-s", tv_ip, "shell", "input", "keyevent", tv_keys[btn_id]], timeout=3)
+        except Exception:
+            pass
         return jsonify({"status": "ok", "id": btn_id})
 
-    cfg = carregar_config()
     for botao in cfg.get("botoes", []):
         if botao.get("id") == btn_id:
             cmd = botao.get("comando")
             if cmd:
-                subprocess.run(cmd, shell=True, env=ENV)
+                try:
+                    subprocess.run(cmd, shell=True, env=ENV, timeout=5)
+                except Exception:
+                    pass
                 return jsonify({"status": "ok", "id": btn_id, "label": botao.get("label")})
     abort(404)
 
@@ -2082,12 +2358,17 @@ def rota_digitar():
 
     return jsonify({"status": "ok"})
 
+ALLOWED_KEYS = {
+    "Return", "Enter", "BackSpace", "space", "Escape", "Tab",
+    "Up", "Down", "Left", "Right", "Page_Up", "Page_Down", "Home", "End"
+}
+
 @app.route('/key', methods=['POST'])
 def rota_tecla():
-    dados = request.get_json() or {}
-    tecla = dados.get('key', '')
-    if not tecla:
-        return jsonify({"status": "error", "message": "Nenhuma tecla informada"})
+    dados = request.get_json(silent=True) or {}
+    tecla = dados.get('key') or request.args.get('key', '')
+    if not tecla or tecla not in ALLOWED_KEYS:
+        return jsonify({"status": "error", "message": "Tecla inválida ou não permitida"}), 400
     
     evdev_map = {
         "Return": 28,
@@ -2095,7 +2376,15 @@ def rota_tecla():
         "BackSpace": 14,
         "space": 57,
         "Escape": 1,
-        "Tab": 15
+        "Tab": 15,
+        "Up": 103,
+        "Down": 108,
+        "Left": 105,
+        "Right": 106,
+        "Page_Up": 104,
+        "Page_Down": 109,
+        "Home": 102,
+        "End": 107
     }
     
     sucesso = False
@@ -2122,10 +2411,16 @@ def rota_tecla():
 @app.route('/timer/set', methods=['POST'])
 def timer_set():
     global timer_target
+    dados = request.get_json(silent=True) or {}
+    raw_min = dados.get('minutes') or request.args.get('minutes')
     try:
-        minutes = int(request.args.get('minutes', 30))
-    except Exception:
-        minutes = 30
+        minutes = int(raw_min)
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "Minutos deve ser um número inteiro válido"}), 400
+
+    if not (1 <= minutes <= 720):
+        return jsonify({"status": "error", "message": "Minutos devem estar entre 1 e 720 (12 horas)"}), 400
+
     with timer_lock:
         target = time.time() + (minutes * 60)
         timer_target = target
@@ -2148,14 +2443,17 @@ def timer_status():
             return jsonify({"active": True, "remaining_seconds": remaining})
         return jsonify({"active": False, "remaining_seconds": 0})
 
-# Compatibilidade com rotas legadas
-@app.route('/play', methods=['GET', 'POST'])
+# Compatibilidade com rotas legadas - SOMENTE POST (GET retorna 405)
+@app.route('/play', methods=['POST'])
 def play(): return executar_comando('play')
-@app.route('/vol-up', methods=['GET', 'POST'])
+
+@app.route('/vol-up', methods=['POST'])
 def vol_up(): return executar_comando('vol-up')
-@app.route('/vol-down', methods=['GET', 'POST'])
+
+@app.route('/vol-down', methods=['POST'])
 def vol_down(): return executar_comando('vol-down')
-@app.route('/poweroff', methods=['GET', 'POST'])
+
+@app.route('/poweroff', methods=['POST'])
 def poweroff(): return executar_comando('poweroff')
 
 def obter_ip_local():

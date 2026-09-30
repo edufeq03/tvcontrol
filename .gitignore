@@ -18,3 +18,9 @@ __pycache__/
 # Sistema Operacional
 .DS_Store
 Thumbs.db
+
+# Configurações com segredos locais
+config.json
+*.key
+*.pem
+*.cert
