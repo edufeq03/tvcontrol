@@ -1,0 +1,178 @@
+{
+  "token": "minhachave123",
+  "porta": 7000,
+  "titulo": "IgnoControl",
+  "botoes": [
+    {
+      "id": "play",
+      "label": "Play / Pause",
+      "sub": "Alternar reprodução",
+      "comando": "playerctl play-pause 2>/dev/null || xdotool key space",
+      "icone": "play",
+      "cor": "blue",
+      "largura": "cheia",
+      "tag": "Mídia",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "vol-down",
+      "label": "Volume -",
+      "sub": "-5%",
+      "comando": "pactl set-sink-volume @DEFAULT_SINK@ -5%",
+      "icone": "vol-down",
+      "cor": "teal",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "vol-up",
+      "label": "Volume +",
+      "sub": "+5%",
+      "comando": "pactl set-sink-volume @DEFAULT_SINK@ +5%",
+      "icone": "vol-up",
+      "cor": "emerald",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "retroceder",
+      "label": "Voltar 10s",
+      "sub": "Retroceder vídeo",
+      "comando": "playerctl position 10- 2>/dev/null || xdotool key Left",
+      "icone": "rewind",
+      "cor": "cyan",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "avancar",
+      "label": "Avançar 10s",
+      "sub": "Avançar vídeo",
+      "comando": "playerctl position 10+ 2>/dev/null || xdotool key Right",
+      "icone": "forward",
+      "cor": "cyan",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "pular-intro",
+      "label": "Pular Intro",
+      "sub": "Atalho Netflix (S)",
+      "comando": "xdotool key s",
+      "icone": "skip",
+      "cor": "amber",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "fullscreen",
+      "label": "Tela Cheia",
+      "sub": "Alternar tela cheia",
+      "comando": "dbus-send --session --dest=org.kde.kglobalaccel --type=method_call /component/kwin org.kde.kglobalaccel.Component.invokeShortcut string:'Window Fullscreen' 2>/dev/null || xdotool key f",
+      "icone": "fullscreen",
+      "cor": "purple",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "mudo",
+      "label": "Mudo",
+      "sub": "Silenciar áudio",
+      "comando": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
+      "icone": "mute",
+      "cor": "amber",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "apagar-tela",
+      "label": "Apagar Tela",
+      "sub": "Descanso de tela",
+      "comando": "dbus-send --session --dest=org.kde.kglobalaccel --type=method_call /component/org_kde_powerdevil org.kde.kglobalaccel.Component.invokeShortcut string:'Turn Off Screen' 2>/dev/null || kscreen-doctor --dpms off 2>/dev/null || xset dpms force off",
+      "icone": "moon",
+      "cor": "indigo",
+      "largura": "metade",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "suspender",
+      "label": "Suspender PC",
+      "sub": "Modo de espera (Sleep)",
+      "comando": "systemctl suspend",
+      "icone": "moon",
+      "cor": "purple",
+      "largura": "metade",
+      "confirmar": true,
+      "ativo": true
+    },
+    {
+      "id": "poweroff",
+      "label": "Desligar PC",
+      "sub": "Encerrar o sistema",
+      "comando": "systemctl poweroff || sudo poweroff",
+      "icone": "power",
+      "cor": "red",
+      "largura": "cheia",
+      "tag": "Power Off",
+      "confirmar": true,
+      "ativo": true
+    },
+    {
+      "id": "tv-vol-down",
+      "label": "Vol - (TV)",
+      "sub": "Android TV",
+      "comando": "adb -s 192.168.15.5 shell input keyevent 25",
+      "icone": "vol-down",
+      "cor": "cyan",
+      "largura": "metade",
+      "tag": "TV",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "tv-vol-up",
+      "label": "Vol + (TV)",
+      "sub": "Android TV",
+      "comando": "adb -s 192.168.15.5 shell input keyevent 24",
+      "icone": "vol-up",
+      "cor": "cyan",
+      "largura": "metade",
+      "tag": "TV",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "tv-play",
+      "label": "Play/Pause (TV)",
+      "sub": "Android TV",
+      "comando": "adb -s 192.168.15.5 shell input keyevent 85",
+      "icone": "play",
+      "cor": "cyan",
+      "largura": "metade",
+      "tag": "TV",
+      "confirmar": false,
+      "ativo": true
+    },
+    {
+      "id": "tv-home",
+      "label": "Home (TV)",
+      "sub": "Android TV",
+      "comando": "adb -s 192.168.15.5 shell input keyevent 3",
+      "icone": "home",
+      "cor": "cyan",
+      "largura": "metade",
+      "tag": "TV",
+      "confirmar": false,
+      "ativo": true
+    }
+  ]
+}
