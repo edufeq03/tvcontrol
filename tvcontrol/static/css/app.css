@@ -344,6 +344,121 @@
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
+        /* Títulos de Seção */
+        .section-label {
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            padding-left: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Deck de Mídia & Hero Play/Pause */
+        .media-deck {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
+        .hero-btn {
+            min-height: 88px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 16px 20px;
+            gap: 16px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(15, 23, 42, 0.88)) !important;
+            border: 1px solid rgba(59, 130, 246, 0.45) !important;
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.28) !important;
+        }
+
+        .hero-btn:hover {
+            border-color: rgba(59, 130, 246, 0.75) !important;
+            box-shadow: 0 8px 26px rgba(37, 99, 235, 0.45) !important;
+        }
+
+        .hero-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.6) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .hero-icon svg {
+            width: 30px;
+            height: 30px;
+            color: #ffffff;
+        }
+
+        .hero-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 3px;
+            text-align: left;
+        }
+
+        .hero-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.3px;
+        }
+
+        .hero-sub {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #93c5fd;
+        }
+
+        .media-quick-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            width: 100%;
+        }
+
+        .media-card {
+            min-height: 104px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 10px;
+        }
+
+        /* Grade de Ações do Sistema */
+        .system-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        .system-card {
+            min-height: 96px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 14px 10px;
+        }
+
         /* Botão de Largura Cheia */
         .ctrl-btn.largura-cheia {
             grid-column: 1 / -1;
@@ -776,15 +891,45 @@
             justify-content: space-between;
             backdrop-filter: blur(16px);
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            gap: 8px;
         }
 
         .tv-badge {
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.92rem;
+            font-size: 0.95rem;
             font-weight: 700;
             color: #ffffff;
+            min-width: 0;
+        }
+
+        .tv-ip-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            background: rgba(59, 130, 246, 0.14);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 9999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #60a5fa;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            outline: none;
+            flex-shrink: 0;
+        }
+
+        .tv-ip-btn:hover {
+            background: rgba(59, 130, 246, 0.28);
+            border-color: rgba(59, 130, 246, 0.55);
+            color: #93c5fd;
+            transform: translateY(-1px);
+        }
+
+        .tv-ip-btn:active {
+            transform: scale(0.96);
         }
 
         .tv-device-info {
@@ -796,6 +941,93 @@
             padding: 3px 8px;
             border-radius: 9999px;
             font-variant-numeric: tabular-nums;
+        }
+
+        .tv-power-btn {
+            background: rgba(239, 68, 68, 0.14) !important;
+            border-color: rgba(239, 68, 68, 0.3) !important;
+            color: #fca5a5 !important;
+        }
+
+        .tv-power-btn:hover {
+            background: rgba(239, 68, 68, 0.25) !important;
+        }
+
+        .tv-app-btn {
+            flex: 1;
+            min-height: 52px;
+            font-size: 0.98rem;
+            font-weight: 700;
+        }
+
+        .tv-app-btn.app-youtube {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+        }
+
+        .tv-app-btn.app-youtube:hover {
+            background: rgba(239, 68, 68, 0.28);
+        }
+
+        .tv-app-btn.app-netflix {
+            background: rgba(229, 9, 20, 0.15);
+            border-color: rgba(229, 9, 20, 0.35);
+            color: #ff6b72;
+        }
+
+        .tv-app-btn.app-netflix:hover {
+            background: rgba(229, 9, 20, 0.28);
+        }
+
+        /* Modal de Configuração de IP da TV */
+        .tv-ip-modal-box {
+            max-width: 340px;
+            padding: 24px 20px 20px;
+        }
+
+        .tv-ip-input-wrap {
+            margin: 14px 0 10px;
+        }
+
+        .tv-ip-input-wrap input {
+            width: 100%;
+            padding: 13px 16px;
+            background: rgba(2, 6, 23, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 16px;
+            font-family: inherit;
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .tv-ip-input-wrap input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+        }
+
+        .tv-test-status {
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 6px;
+            min-height: 20px;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .tv-test-status.testing { color: #fbbf24; }
+        .tv-test-status.online { color: #4ade80; }
+        .tv-test-status.offline { color: #f87171; }
+
+        .modal-btn-save {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
         }
 
         /* Toast Feedback */

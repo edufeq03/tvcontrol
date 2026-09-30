@@ -46,19 +46,41 @@
                     <span class="vol-percent" id="volPercent">--%</span>
                 </div>
 
-                <div class="grid-controls">
+                <!-- SEÇÃO 1: REPRODUÇÃO & NAVEGAÇÃO DE MÍDIA -->
+                <div class="section-label">Controles de Mídia</div>
+                
+                <div class="media-deck">
+                    <!-- Botão Hero Principal Play / Pause -->
                     {% for botao in config.botoes %}
-                    {% if botao.get('ativo', True) and botao.get('tag') != 'TV' %}
-                    
-                    <button class="ctrl-btn cor-{{ botao.get('cor', 'blue') }} largura-{{ botao.get('largura', 'metade') }}"
+                    {% if botao.id == 'play' and botao.get('ativo', True) %}
+                    <button class="ctrl-btn hero-btn cor-{{ botao.get('cor', 'blue') }}"
                             id="btn-{{ botao.id }}"
                             data-btn-id="{{ botao.id }}"
                             data-label="{{ botao.label }}"
-                            data-confirm="{{ 'true' if botao.get('confirmar') else 'false' }}"
+                            data-confirm="false"
                             data-sub="{{ botao.get('sub', '') }}">
-                        
-                        {% if botao.get('largura') == 'cheia' %}
-                        <div class="main-content">
+                        <div class="ctrl-icon hero-icon">
+                            {{ icones.get(botao.get('icone'), icones['play']) | safe }}
+                        </div>
+                        <div class="hero-text">
+                            <span class="hero-title">{{ botao.label }}</span>
+                            <span class="hero-sub">{{ botao.sub }}</span>
+                        </div>
+                    </button>
+                    {% endif %}
+                    {% endfor %}
+
+                    <!-- Grade 2x2: Navegação & Atalhos Essenciais -->
+                    <div class="media-quick-grid">
+                        {% for b_id in ['retroceder', 'avancar', 'pular-intro', 'fullscreen'] %}
+                        {% for botao in config.botoes %}
+                        {% if botao.id == b_id and botao.get('ativo', True) %}
+                        <button class="ctrl-btn media-card cor-{{ botao.get('cor', 'cyan') }}"
+                                id="btn-{{ botao.id }}"
+                                data-btn-id="{{ botao.id }}"
+                                data-label="{{ botao.label }}"
+                                data-confirm="false"
+                                data-sub="{{ botao.get('sub', '') }}">
                             <div class="ctrl-icon">
                                 {{ icones.get(botao.get('icone'), icones['default']) | safe }}
                             </div>
@@ -68,12 +90,56 @@
                                 <span class="ctrl-sub">{{ botao.sub }}</span>
                                 {% endif %}
                             </div>
-                        </div>
-                        {% if botao.get('tag') %}
-                        <span class="pill-tag">{{ botao.tag }}</span>
+                        </button>
                         {% endif %}
+                        {% endfor %}
+                        {% endfor %}
+                    </div>
+                </div>
 
-                        {% else %}
+                <!-- SEÇÃO 2: AÇÕES DO SISTEMA & ENERGIA (Protegida) -->
+                <div class="section-label" style="margin-top: 14px;">Sistema & Energia</div>
+                <div class="system-actions-grid">
+                    {% for b_id in ['apagar-tela', 'poweroff'] %}
+                    {% for botao in config.botoes %}
+                    {% if botao.id == b_id and botao.get('ativo', True) %}
+                    <button class="ctrl-btn system-card cor-{{ botao.get('cor', 'indigo') }}"
+                            id="btn-{{ botao.id }}"
+                            data-btn-id="{{ botao.id }}"
+                            data-label="{{ botao.label }}"
+                            data-confirm="{{ 'true' if botao.get('confirmar') else 'false' }}"
+                            data-sub="{{ botao.get('sub', '') }}">
+                        <div class="ctrl-icon">
+                            {{ icones.get(botao.get('icone'), icones['default']) | safe }}
+                        </div>
+                        <div class="ctrl-text">
+                            <span class="ctrl-title">{{ botao.label }}</span>
+                            <span class="ctrl-sub">{{ botao.sub }}</span>
+                        </div>
+                    </button>
+                    {% endif %}
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+
+                <!-- Botões Adicionais Personalizados (caso o usuário adicione no config) -->
+                {% set standard_ids = ['play', 'vol-up', 'vol-down', 'mudo', 'retroceder', 'avancar', 'pular-intro', 'fullscreen', 'apagar-tela', 'poweroff'] %}
+                {% set extra_buttons = [] %}
+                {% for b in config.botoes %}
+                    {% if b.get('ativo', True) and b.get('tag') != 'TV' and b.id not in standard_ids %}
+                        {% set _ = extra_buttons.append(b) %}
+                    {% endif %}
+                {% endfor %}
+                {% if extra_buttons %}
+                <div class="section-label" style="margin-top: 14px;">Outros Atalhos</div>
+                <div class="grid-controls">
+                    {% for botao in extra_buttons %}
+                    <button class="ctrl-btn cor-{{ botao.get('cor', 'blue') }} largura-{{ botao.get('largura', 'metade') }}"
+                            id="btn-{{ botao.id }}"
+                            data-btn-id="{{ botao.id }}"
+                            data-label="{{ botao.label }}"
+                            data-confirm="{{ 'true' if botao.get('confirmar') else 'false' }}"
+                            data-sub="{{ botao.get('sub', '') }}">
                         <div class="ctrl-icon">
                             {{ icones.get(botao.get('icone'), icones['default']) | safe }}
                         </div>
@@ -83,15 +149,10 @@
                             <span class="ctrl-sub">{{ botao.sub }}</span>
                             {% endif %}
                         </div>
-                        {% if botao.get('tag') %}
-                        <span class="card-tag-badge">{{ botao.tag }}</span>
-                        {% endif %}
-                        {% endif %}
                     </button>
-
-                    {% endif %}
                     {% endfor %}
                 </div>
+                {% endif %}
             </section>
 
             <!-- ABA 2: TOUCHPAD / MOUSE VIRTUAL -->
@@ -172,15 +233,23 @@
             <!-- ABA 4: CONTROLES DA ANDROID TV -->
             <section id="view-tv" class="tab-view">
                 <div class="tv-wrapper">
+                    <!-- Card de Cabeçalho com IP Interativo e Status -->
                     <div class="tv-header-card">
                         <div class="tv-badge">
                             <span>📺</span>
-                            <span>Android TV Remote</span>
+                            <span>Android TV</span>
+                            <div class="status-badge" id="tvConnBadge" style="margin-left: 6px; padding: 2px 8px; font-size: 0.72rem;">
+                                <span class="status-dot"></span>
+                                <span>Online</span>
+                            </div>
                         </div>
-                        <div class="tv-device-info">Dispositivo: {{ config.get('tv_ip', '192.168.1.100') }}</div>
+                        <button type="button" class="tv-ip-btn" onclick="abrirModalTvIp()" title="Toque para alterar o IP da TV">
+                            <span>IP: <strong id="displayTvIp">{{ config.get('tv_ip', '192.168.1.100') }}</strong></span>
+                            <span>✏️</span>
+                        </button>
                     </div>
 
-                    <!-- D-Pad Direcional Real -->
+                    <!-- D-Pad Direcional Central (260px) -->
                     <div class="dpad-container">
                         <div class="dpad-cross">
                             <button type="button" class="dpad-btn dpad-up" onclick="executar('tv-up', 'Cima')" aria-label="Cima">▲</button>
@@ -191,18 +260,29 @@
                         </div>
                     </div>
 
-                    <!-- Teclas de Navegação da TV -->
+                    <!-- Linha 1: Navegação Principal da TV -->
                     <div class="tv-actions-row">
                         <button type="button" class="tv-nav-btn" onclick="executar('tv-back', 'Voltar')">↩ Voltar</button>
                         <button type="button" class="tv-nav-btn" onclick="executar('tv-home', 'Início')">🏠 Início</button>
                         <button type="button" class="tv-nav-btn" onclick="executar('tv-play', 'Play/Pause')">⏯️ Play</button>
                     </div>
 
-                    <!-- Controle de Volume e Energia da TV -->
+                    <!-- Linha 2: Volume, Mudo e Energia da TV -->
                     <div class="tv-actions-row">
                         <button type="button" class="tv-nav-btn" onclick="executar('tv-vol-down', 'TV Vol -')">🔉 Vol -</button>
                         <button type="button" class="tv-nav-btn" onclick="executar('tv-vol-up', 'TV Vol +')">🔊 Vol +</button>
-                        <button type="button" class="tv-nav-btn" onclick="executar('tv-power', 'TV Power')">⏻ Power</button>
+                        <button type="button" class="tv-nav-btn" onclick="executar('tv-mute', 'TV Mudo')">🔇 Mudo</button>
+                        <button type="button" class="tv-nav-btn tv-power-btn" onclick="executar('tv-power', 'TV Power')">⏻ Power</button>
+                    </div>
+
+                    <!-- Linha 3: Atalhos Rápidos de Apps da TV (YouTube / Netflix) -->
+                    <div class="tv-actions-row" style="margin-top: 2px;">
+                        <button type="button" class="tv-nav-btn tv-app-btn app-youtube" onclick="executar('tv-youtube', 'YouTube TV')">
+                            <span>▶</span> <span>YouTube</span>
+                        </button>
+                        <button type="button" class="tv-nav-btn tv-app-btn app-netflix" onclick="executar('tv-netflix', 'Netflix TV')">
+                            <span>🎬</span> <span>Netflix</span>
+                        </button>
                     </div>
                 </div>
             </section>
@@ -279,6 +359,29 @@
             
             <div class="modal-actions" style="margin-top: 14px;">
                 <button class="modal-btn modal-btn-cancel" style="width: 100%;" onclick="fecharModalQR()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Alterar IP da Android TV -->
+    <div id="tvIpModal" class="modal-backdrop" onclick="if(event.target===this) fecharModalTvIp()">
+        <div class="modal-box tv-ip-modal-box">
+            <div class="modal-close-btn" onclick="fecharModalTvIp()">✕</div>
+            <div class="modal-icon" style="background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.35); color: #60a5fa; font-size: 1.4rem;">
+                📺
+            </div>
+            <h3 class="modal-title">IP da Android TV</h3>
+            <p class="modal-desc">Defina o endereço IP da sua televisão na rede Wi-Fi local para controle via ADB:</p>
+
+            <div class="tv-ip-input-wrap">
+                <input type="text" id="tvIpInput" inputmode="decimal" placeholder="Ex: 192.168.15.60" value="{{ config.get('tv_ip', '192.168.1.100') }}">
+            </div>
+
+            <div id="tvTestStatus" class="tv-test-status"></div>
+
+            <div class="modal-actions" style="margin-top: 14px; gap: 8px;">
+                <button type="button" class="modal-btn modal-btn-cancel" onclick="testarConexaoTv(true)">🔍 Testar</button>
+                <button type="button" class="modal-btn modal-btn-save" id="btnSalvarTvIp" onclick="salvarTvIp()">💾 Salvar IP</button>
             </div>
         </div>
     </div>

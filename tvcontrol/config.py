@@ -84,6 +84,23 @@ def validar_config(cfg):
             raise ValueError(f"ID do botão contém caracteres especiais não permitidos: '{btn_id}'")
     return True
 
+def atualizar_tv_ip(novo_ip):
+    """
+    Valida e atualiza persistentemente o IP da TV na configuração.
+    """
+    global _CONFIG_CACHE
+    novo_ip = str(novo_ip).strip()
+    try:
+        ipaddress.ip_address(novo_ip)
+    except ValueError:
+        raise ValueError(f"Endereço IP inválido: '{novo_ip}'. Informe um IPv4 válido.")
+
+    cfg = carregar_config()
+    cfg["tv_ip"] = novo_ip
+    salvar_config(cfg)
+    _CONFIG_CACHE = dict(cfg)
+    return novo_ip
+
 _CONFIG_CACHE = None
 
 def carregar_config(reload=False):

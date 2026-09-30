@@ -77,6 +77,8 @@ const urlParams = new URLSearchParams(window.location.search);
                 checkTimerStatus();
             } else if (tabId === 'controls') {
                 carregarVolume();
+            } else if (tabId === 'tv') {
+                testarConexaoTv(false);
             }
         }
 
@@ -469,3 +471,110 @@ const urlParams = new URLSearchParams(window.location.search);
                 });
         }
         setInterval(checkConnection, 4000);
+
+        // ==========================================
+        // 📺 GESTÃO E TESTE DE IP DA ANDROID TV
+        // ==========================================
+        function abrirModalTvIp() {
+            const modal = document.getElementById('tvIpModal');
+            const input = document.getElementById('tvIpInput');
+            const currentIp = document.getElementById('displayTvIp')?.textContent?.trim() || '';
+            if (input) input.value = currentIp;
+            const testStatus = document.getElementById('tvTestStatus');
+            if (testStatus) {
+                testStatus.textContent = '';
+                testStatus.className = 'tv-test-status';
+            }
+            if (modal) modal.classList.add('active');
+            setTimeout(() => { if (input) input.focus(); }, 150);
+        }
+
+        function fecharModalTvIp() {
+            const modal = document.getElementById('tvIpModal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function salvarTvIp() {
+            const input = document.getElementById('tvIpInput');
+            const novoIp = input ? input.value.trim() : '';
+            if (!novoIp) {
+                showToast('Informe um endereço IP válido.');
+                return;
+            }
+
+            const btn = document.getElementById('btnSalvarTvIp');
+            if (btn) btn.disabled = true;
+
+            apiFetch('/api/config/tv-ip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tv_ip: novoIp })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (btn) btn.disabled = false;
+                if (data.status === 'ok') {
+                    const display = document.getElementById('displayTvIp');
+                    if (display) display.textContent = data.tv_ip;
+                    fecharModalTvIp();
+                    showToast(`IP da TV salvo: ${data.tv_ip}`);
+                    testarConexaoTv(false);
+                } else {
+                    showToast(data.message || 'Erro ao salvar IP.');
+                }
+            })
+            .catch(() => {
+                if (btn) btn.disabled = false;
+                showToast('Erro de rede ao salvar IP.');
+            });
+        }
+
+        function testarConexaoTv(interativo = true) {
+            const input = document.getElementById('tvIpInput');
+            const currentIp = document.getElementById('displayTvIp')?.textContent?.trim();
+            const targetIp = (input && input.value.trim()) ? input.value.trim() : currentIp;
+            const testStatus = document.getElementById('tvTestStatus');
+            const badge = document.getElementById('tvConnBadge');
+
+            if (interativo && testStatus) {
+                testStatus.textContent = '⏳ Testando conexão com a TV...';
+                testStatus.className = 'tv-test-status testing';
+            }
+
+            apiFetch('/api/tv/test-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tv_ip: targetIp })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (interativo && testStatus) {
+                    if (data.online) {
+                        testStatus.textContent = `✓ ${data.message}`;
+                        testStatus.className = 'tv-test-status online';
+                    } else {
+                        testStatus.textContent = `✕ ${data.message}`;
+                        testStatus.className = 'tv-test-status offline';
+                    }
+                }
+                if (badge) {
+                    const dot = badge.querySelector('.status-dot');
+                    const txt = badge.querySelector('span:last-child');
+                    if (data.online) {
+                        if (dot) dot.style.backgroundColor = '#22c55e';
+                        if (txt) txt.textContent = 'Online';
+                        badge.style.color = '#4ade80';
+                    } else {
+                        if (dot) dot.style.backgroundColor = '#94a3b8';
+                        if (txt) txt.textContent = 'Off';
+                        badge.style.color = '#94a3b8';
+                    }
+                }
+            })
+            .catch(() => {
+                if (interativo && testStatus) {
+                    testStatus.textContent = 'Erro de comunicação com o servidor.';
+                    testStatus.className = 'tv-test-status offline';
+                }
+            });
+        }

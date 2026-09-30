@@ -1,7 +1,7 @@
-from flask import Blueprint, jsonify, abort
-from tvcontrol.config import carregar_config
+from flask import Blueprint, jsonify, abort, request
+from tvcontrol.config import carregar_config, atualizar_tv_ip
 from tvcontrol.services.media import executar_comando_seguro
-from tvcontrol.services.tv import executar_comando_tv, TV_KEYS
+from tvcontrol.services.tv import executar_comando_tv, testar_conexao_tv, TV_KEYS, TV_APPS
 from tvcontrol.services.power import executar_desligamento
 from tvcontrol.auth import log_audit
 
@@ -11,8 +11,8 @@ media_bp = Blueprint('media', __name__)
 def executar_comando(btn_id):
     cfg = carregar_config()
 
-    # 1. Comandos direcionados à TV Android (D-Pad / Teclas)
-    if btn_id in TV_KEYS:
+    # 1. Comandos direcionados à TV Android (D-Pad / Teclas / Apps)
+    if btn_id in TV_KEYS or btn_id in TV_APPS:
         tv_ip = cfg.get("tv_ip", "192.168.1.100")
         sucesso, erro = executar_comando_tv(btn_id, tv_ip)
         if erro and "IP da TV inválido" in erro:
@@ -30,6 +30,42 @@ def executar_comando(btn_id):
 
     log_audit("warning", f"Tentativa de executar comando inexistente: {btn_id}")
     abort(404)
+
+@media_bp.route('/api/config/tv-ip', methods=['GET', 'POST'])
+def rota_config_tv_ip():
+    cfg = carregar_config()
+    if request.method == 'GET':
+        return jsonify({"status": "ok", "tv_ip": cfg.get("tv_ip", "192.168.1.100")})
+
+    dados = request.get_json(silent=True) or request.form or {}
+    novo_ip = dados.get("tv_ip", "").strip()
+    if not novo_ip:
+        return jsonify({"status": "error", "message": "Nenhum endereço IP fornecido."}), 400
+
+    try:
+        ip_salvo = atualizar_tv_ip(novo_ip)
+        log_audit("info", f"IP da Android TV atualizado para {ip_salvo}")
+        return jsonify({
+            "status": "ok",
+            "tv_ip": ip_salvo,
+            "message": f"IP da TV salvo com sucesso: {ip_salvo}"
+        })
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+@media_bp.route('/api/tv/test-connection', methods=['POST'])
+def rota_testar_tv():
+    dados = request.get_json(silent=True) or request.form or {}
+    cfg = carregar_config()
+    target_ip = dados.get("tv_ip") or cfg.get("tv_ip", "192.168.1.100")
+
+    sucesso, mensagem = testar_conexao_tv(target_ip)
+    return jsonify({
+        "status": "ok" if sucesso else "error",
+        "online": sucesso,
+        "tv_ip": target_ip,
+        "message": mensagem
+    })
 
 # Compatibilidade com rotas legadas - SOMENTE POST (GET retorna 405)
 @media_bp.route('/play', methods=['POST'])
@@ -49,3 +85,4 @@ def poweroff():
     log_audit("warning", "Desligamento do sistema solicitado via /poweroff")
     sucesso = executar_desligamento()
     return jsonify({"status": "ok" if sucesso else "error", "message": "Desligando o PC..."})
+

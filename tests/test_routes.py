@@ -161,3 +161,31 @@ def test_main_login_and_logout(client):
     # Static assets
     assert client.get('/favicon.ico').status_code == 204
     assert client.get('/icon.png').status_code == 200
+
+def test_tv_ip_endpoints(client):
+    token = carregar_config().get('token')
+    client.set_cookie('ignocontrol_session', token)
+
+    # 1. Get TV IP
+    res_get = client.get('/api/config/tv-ip')
+    assert res_get.status_code == 200
+    assert 'tv_ip' in res_get.get_json()
+
+    # 2. Update TV IP with valid IPv4
+    res_post = client.post('/api/config/tv-ip', json={'tv_ip': '192.168.15.55'})
+    assert res_post.status_code == 200
+    assert res_post.get_json().get('tv_ip') == '192.168.15.55'
+
+    # 3. Update TV IP with invalid IP
+    res_invalid = client.post('/api/config/tv-ip', json={'tv_ip': '999.999.999.999'})
+    assert res_invalid.status_code == 400
+
+    # 4. Update TV IP empty
+    res_empty = client.post('/api/config/tv-ip', json={'tv_ip': ''})
+    assert res_empty.status_code == 400
+
+    # 5. Test connection endpoint
+    res_test = client.post('/api/tv/test-connection', json={'tv_ip': '127.0.0.1'})
+    assert res_test.status_code == 200
+    assert 'online' in res_test.get_json()
+
